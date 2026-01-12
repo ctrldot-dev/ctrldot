@@ -92,7 +92,7 @@ dot new node "My Goal" --yes
 dot show node:123
 
 # View history
-dot history ProductTree:/MyProject
+dot history ProductTree:/TestProduct
 
 # Create a link
 dot link node:123 node:456 --type RELATED_TO --yes
