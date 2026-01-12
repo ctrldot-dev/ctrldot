@@ -83,7 +83,7 @@ The `dot` CLI provides a git-like interface for interacting with the kernel.
 dot status
 
 # Set namespace
-dot use ProductTree:/MyProject
+dot use ProductTree:/TestProduct
 
 # Create a node
 dot new node "My Goal" --yes
