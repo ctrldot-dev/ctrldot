@@ -136,10 +136,16 @@ Expands nodes with their roles, links, and materials.
 ```json
 {
   "nodes": [...],
-  "roles": [...],
+  "role_assignments": [...],
   "links": [...],
   "materials": [...]
 }
+```
+
+**CLI Usage:**
+```bash
+dot show node:123
+dot show node:123 --json
 ```
 
 ### GET /v1/history
