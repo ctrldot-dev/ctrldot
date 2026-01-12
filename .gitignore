@@ -9,6 +9,9 @@ kernel
 # Test binary
 *.test
 
+# Context directory (internal documentation, not for deployment)
+context/
+
 # Output of the go coverage tool
 *.out
 

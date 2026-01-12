@@ -1,1 +1,0 @@
--- See migrations/0001_init.sql for authoritative schema.
