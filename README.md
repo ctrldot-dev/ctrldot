@@ -58,6 +58,56 @@ go run cmd/kernel/main.go
 
 The server will start on port 8080 (configurable via `PORT` environment variable).
 
+### Install the CLI
+
+The `dot` CLI provides a git-like interface for interacting with the kernel:
+
+```bash
+# Build the CLI
+make build-dot
+
+# Install to ~/bin (adds to PATH)
+make install-dot
+```
+
+See [cmd/dot/README.md](cmd/dot/README.md) for complete CLI documentation.
+
+## Command Line Interface (CLI)
+
+The `dot` CLI provides a git-like interface for interacting with the kernel.
+
+### Quick Examples
+
+```bash
+# Check status
+dot status
+
+# Set namespace
+dot use ProductTree:/MyProject
+
+# Create a node
+dot new node "My Goal" --yes
+
+# View a node
+dot show node:123
+
+# View history
+dot history ProductTree:/MyProject
+
+# Create a link
+dot link node:123 node:456 --type RELATED_TO --yes
+
+# Assign a role
+dot role assign node:123 --role Goal --yes
+```
+
+### CLI Documentation
+
+- [CLI README](cmd/dot/README.md) - Complete CLI documentation
+- [CLI Quick Start](cmd/dot/QUICKSTART.md) - Quick start guide
+- [CLI Examples](cmd/dot/EXAMPLES.md) - Practical examples
+- [CLI Installation](cmd/dot/INSTALL.md) - Installation guide
+
 ## API Endpoints
 
 ### POST /v1/plan
@@ -230,7 +280,9 @@ make build
 
 ```
 .
-├── cmd/kernel/          # Main application
+├── cmd/
+│   ├── kernel/         # Main kernel application
+│   └── dot/             # Dot CLI application
 ├── internal/
 │   ├── domain/         # Domain types
 │   ├── store/          # Database layer
@@ -240,7 +292,6 @@ make build
 │   ├── kernel/         # Plan/Apply orchestration
 │   └── api/            # HTTP handlers
 ├── migrations/         # Database migrations
-├── context/            # Specification documents
 └── docker-compose.yml  # Local Postgres setup
 ```
 
