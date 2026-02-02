@@ -34,12 +34,23 @@ app.use('/src', express.static(distSrcPath, {
   }
 }));
 
-// Fallback: serve index.html for SPA routing
-app.get('*', (req: express.Request, res: express.Response) => {
-  // Only serve index.html for non-API routes
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(join(publicPath, 'index.html'));
+// Serve materials directory (for material content files)
+const materialsPath = join(__dirname, '../../materials');
+app.use('/materials', express.static(materialsPath, {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.md')) {
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    }
   }
+}));
+
+// Fallback: serve index.html for SPA routing, or 404 for unknown API routes
+app.get('*', (req: express.Request, res: express.Response) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ error: 'Not found', path: req.path });
+    return;
+  }
+  res.sendFile(join(publicPath, 'index.html'));
 });
 
 // Start server

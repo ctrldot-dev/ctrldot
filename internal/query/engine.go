@@ -17,6 +17,12 @@ type Engine interface {
 
 	// Diff computes the difference between two sequence numbers
 	Diff(ctx context.Context, req DiffRequest) (*DiffResult, error)
+
+	// ListNamespaces returns namespace IDs that have at least one node (role assignment) at latest seq
+	ListNamespaces(ctx context.Context) ([]string, error)
+
+	// GetNamespaceRoot returns the root node for a namespace (no incoming CONTAINS), preferring role *.Domain
+	GetNamespaceRoot(ctx context.Context, namespaceID string) (nodeID, title, role string, err error)
 }
 
 // ExpandRequest contains parameters for expand
@@ -62,4 +68,32 @@ func NewEngine(store store.Store) Engine {
 
 type engine struct {
 	store store.Store
+}
+
+// ListNamespaces implements Engine
+func (e *engine) ListNamespaces(ctx context.Context) ([]string, error) {
+	tx, err := e.store.OpenTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	asofSeq, err := e.store.ResolveAsOf(ctx, domain.AsOf{})
+	if err != nil {
+		return nil, err
+	}
+	return tx.ListNamespaceIDsWithNodes(ctx, asofSeq)
+}
+
+// GetNamespaceRoot implements Engine
+func (e *engine) GetNamespaceRoot(ctx context.Context, namespaceID string) (nodeID, title, role string, err error) {
+	tx, err := e.store.OpenTx(ctx)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer tx.Rollback()
+	asofSeq, err := e.store.ResolveAsOf(ctx, domain.AsOf{})
+	if err != nil {
+		return "", "", "", err
+	}
+	return tx.GetNamespaceRoot(ctx, namespaceID, asofSeq)
 }

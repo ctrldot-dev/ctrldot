@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product Ledger Demo</title>
+  <title>Decision Ledger Demo</title>
   <script type="importmap">
     {
       "imports": {
@@ -120,23 +120,9 @@
 </head>
 <body>
   <div id="app">
-    <div class="header">
-      <h1>Product Ledger Demo</h1>
-      <div class="connection-indicator">
-        <span class="connection-dot" id="connection-dot"></span>
-        <span id="connection-status">Checking...</span>
-      </div>
-    </div>
-    <div class="tabs">
-      <button class="tab active" data-tab="products">Products</button>
-      <button class="tab" data-tab="intent">Intent</button>
-      <button class="tab" data-tab="ledger">Ledger</button>
-    </div>
-    <div class="content" id="content">
-      <div class="loading">Loading...</div>
-    </div>
+    <div class="loading" style="padding: 2rem;">Loading...</div>
   </div>
   
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/main.js?v=2"></script>
 </body>
 </html>

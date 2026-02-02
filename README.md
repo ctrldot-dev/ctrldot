@@ -106,6 +106,17 @@ The Web Dot server is configured via `web-dot/server/config.ts`:
 - Namespace (default: `ProductLedger:/Kesteron`)
 - Pinned roots (FieldServe, AssetLink, SO-1, AO-1, TT-1)
 - Server port (default: `3000`)
+- **NAMESPACE** env: set to `FinLedger:/Kesteron/Treasury` or `FinLedger:/Kesteron/StablecoinReserves` to browse FinLedger (use `?root=<node_id>` for products tree; root IDs are printed when running `make seed-finledger`)
+
+### Second domain: Financial Ledger (FinLedger:*)
+
+The kernel supports a second domain overlay using the same Node / RoleAssignment / Link abstractions. FinLedger namespaces use a separate policy set (`financialledger-policyset.yaml`) and are validated only against it.
+
+1. **Migrations** (run with `make migrate`): `0002_finledger_namespaces.sql` creates namespaces `FinLedger`, `FinLedger:/Kesteron/Treasury`, `FinLedger:/Kesteron/StablecoinReserves`.
+2. **Register policy set** (after migrate, kernel need not be running): `make bootstrap-finledger` loads `financialledger-policyset.yaml` for `FinLedger:*`.
+3. **Ingest seed graphs** (kernel must be running): `make seed-finledger` ingests `kesteron-treasury-finledger-seed.yaml` and `kesteron-stablecoinreserves-finledger-seed.yaml` into the same kernel instance. Root node IDs for the UI are printed.
+4. **Browse in UI**: set `NAMESPACE=FinLedger:/Kesteron/Treasury` (or StablecoinReserves), then open products tree with `?root=<root_node_id>`.
+5. **CLI**: `dot use FinLedger:/Kesteron/Treasury` then `dot ls`, `dot show <node_id>`, etc.
 
 ### Development
 

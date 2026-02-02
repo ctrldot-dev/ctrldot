@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/futurematic/kernel/internal/domain"
 )
@@ -470,4 +471,113 @@ func (t *PostgresTx) RetireRoleAssignment(ctx context.Context, roleAssignmentID 
 		return fmt.Errorf("failed to retire role assignment: %w", err)
 	}
 	return nil
+}
+
+// ListNamespaceIDsWithNodes returns distinct namespace_ids that have at least one role assignment visible at asofSeq.
+func (t *PostgresTx) ListNamespaceIDsWithNodes(ctx context.Context, asofSeq int64) ([]string, error) {
+	rows, err := t.tx.QueryContext(ctx,
+		`SELECT DISTINCT namespace_id FROM role_assignments
+		 WHERE created_seq <= $1 AND (retired_seq IS NULL OR retired_seq > $1)
+		 ORDER BY namespace_id`,
+		asofSeq,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespaces: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var ns string
+		if err := rows.Scan(&ns); err != nil {
+			return nil, err
+		}
+		out = append(out, ns)
+	}
+	return out, rows.Err()
+}
+
+// GetNamespaceRoot returns a root node for the namespace: one with no incoming CONTAINS link.
+// Prefers a node with role *.Domain. Returns nodeID, title, role.
+func (t *PostgresTx) GetNamespaceRoot(ctx context.Context, namespaceID string, asofSeq int64) (nodeID, title, role string, err error) {
+	// Nodes that have a role in this namespace
+	rows, err := t.tx.QueryContext(ctx,
+		`SELECT DISTINCT r.node_id, r.role FROM role_assignments r
+		 WHERE r.namespace_id = $1 AND r.created_seq <= $2 AND (r.retired_seq IS NULL OR r.retired_seq > $2)`,
+		namespaceID, asofSeq,
+	)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to list nodes in namespace: %w", err)
+	}
+	defer rows.Close()
+	nodeRoles := make(map[string][]string)
+	for rows.Next() {
+		var nid, r string
+		if err := rows.Scan(&nid, &r); err != nil {
+			return "", "", "", err
+		}
+		nodeRoles[nid] = append(nodeRoles[nid], r)
+	}
+	if err := rows.Err(); err != nil {
+		return "", "", "", err
+	}
+	// to_node_ids that have an incoming CONTAINS in this namespace
+	rows2, err := t.tx.QueryContext(ctx,
+		`SELECT to_node_id FROM links
+		 WHERE namespace_id = $1 AND type = 'CONTAINS' AND created_seq <= $2 AND (retired_seq IS NULL OR retired_seq > $2)`,
+		namespaceID, asofSeq,
+	)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to list contains links: %w", err)
+	}
+	defer rows2.Close()
+	hasIncoming := make(map[string]bool)
+	for rows2.Next() {
+		var to string
+		if err := rows2.Scan(&to); err != nil {
+			return "", "", "", err
+		}
+		hasIncoming[to] = true
+	}
+	if err := rows2.Err(); err != nil {
+		return "", "", "", err
+	}
+	// Roots = nodes in namespace with no incoming CONTAINS
+	type rootInfo struct{ nodeID, role string }
+	var roots []rootInfo
+	for nid, roles := range nodeRoles {
+		if hasIncoming[nid] {
+			continue
+		}
+		for _, r := range roles {
+			roots = append(roots, rootInfo{nid, r})
+			break
+		}
+	}
+	if len(roots) == 0 {
+		return "", "", "", fmt.Errorf("no root node in namespace %s", namespaceID)
+	}
+	// Prefer role *.Domain
+	var chosenNodeID, chosenRole string
+	for _, r := range roots {
+		if strings.HasSuffix(r.role, ".Domain") {
+			chosenNodeID, chosenRole = r.nodeID, r.role
+			break
+		}
+	}
+	if chosenNodeID == "" {
+		chosenNodeID, chosenRole = roots[0].nodeID, roots[0].role
+	}
+	// Get node title
+	var nodeTitle string
+	err = t.tx.QueryRowContext(ctx,
+		`SELECT title FROM nodes WHERE node_id = $1 AND created_seq <= $2 AND (retired_seq IS NULL OR retired_seq > $2)`,
+		chosenNodeID, asofSeq,
+	).Scan(&nodeTitle)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", "", "", fmt.Errorf("root node not visible: %s", chosenNodeID)
+		}
+		return "", "", "", err
+	}
+	return chosenNodeID, nodeTitle, chosenRole, nil
 }

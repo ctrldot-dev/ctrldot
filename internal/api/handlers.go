@@ -267,6 +267,39 @@ func (h *Handlers) Healthz(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, map[string]bool{"ok": true}, http.StatusOK)
 }
 
+// Namespaces handles GET /v1/namespaces
+func (h *Handlers) Namespaces(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ids, err := h.queryEngine.ListNamespaces(r.Context())
+	if err != nil {
+		respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]interface{}{"namespace_ids": ids}, http.StatusOK)
+}
+
+// NamespaceRoot handles GET /v1/namespace_root?namespace_id=...
+func (h *Handlers) NamespaceRoot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	namespaceID := r.URL.Query().Get("namespace_id")
+	if namespaceID == "" {
+		respondError(w, NewError(ErrorCodeValidation, "namespace_id is required", nil), http.StatusBadRequest)
+		return
+	}
+	nodeID, title, role, err := h.queryEngine.GetNamespaceRoot(r.Context(), namespaceID)
+	if err != nil {
+		respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]string{"node_id": nodeID, "title": title, "role": role}, http.StatusOK)
+}
+
 // Helper functions
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {

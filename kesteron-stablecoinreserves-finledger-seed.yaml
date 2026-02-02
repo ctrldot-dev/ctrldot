@@ -1,0 +1,51 @@
+# Kesteron Stablecoin Reserves — Financial Ledger seed graph
+# Ingest into namespace FinLedger:/Kesteron/StablecoinReserves
+
+namespace: FinLedger:/Kesteron/StablecoinReserves
+
+nodes:
+  - title: Stablecoin Reserves Root
+    role: LedgerRoot
+  - title: USDC
+    role: ReserveAsset
+  - title: USDT
+    role: ReserveAsset
+  - title: DAI
+    role: ReserveAsset
+  - title: Custody Account A
+    role: TreasuryAccount
+  - title: Custody Account B
+    role: TreasuryAccount
+  # Intent (Intent tab): Strategic Objectives and Policies
+  - title: Safeguard reserve assets and ensure redeemability
+    role: Fin.Objective
+  - title: Custody and reserve attestation policy
+    role: Fin.Policy
+  - title: Stablecoin operational controls
+    role: Fin.Policy
+
+links:
+  - from: Stablecoin Reserves Root
+    to: USDC
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: USDT
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: DAI
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: Custody Account A
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: Custody Account B
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: Safeguard reserve assets and ensure redeemability
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: Custody and reserve attestation policy
+    type: CONTAINS
+  - from: Stablecoin Reserves Root
+    to: Stablecoin operational controls
+    type: CONTAINS

@@ -124,7 +124,7 @@ export default function LedgerEntryDetails({ entry, onClose, onOpenNode }: Ledge
                   <div style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>{nodeId}</div>
                   {onOpenNode && (
                     <div style={{ fontSize: '0.75rem', color: '#0066cc', marginTop: '0.25rem' }}>
-                      Click to open in Products
+                      Show in tree
                     </div>
                   )}
                 </div>

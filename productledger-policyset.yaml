@@ -1,0 +1,22 @@
+# Product Ledger policy set — namespace-scoped for ProductLedger:*
+# Applies to ProductLedger:/Kesteron/FieldServe and ProductLedger:/Kesteron/AssetLink (and any ProductLedger:*).
+# Do not merge with Financial Ledger policy set.
+
+policy_set: productledger
+version: "1"
+applies_to:
+  namespace: "ProductLedger:*"
+
+rules:
+  # CONTAINS hierarchy: one Product.Domain root, Goal -> Job -> WorkItem
+  - id: pl-contains-role-edge
+    when:
+      op: [CreateLink]
+      link_type: CONTAINS
+    require:
+      - predicate: role_edge_allowed
+        args:
+          parent_role: [Product.Domain, Goal, Job]
+          child_role: [Goal, Job, WorkItem]
+    effect:
+      deny: "CONTAINS link not allowed for this parent/child role combination"

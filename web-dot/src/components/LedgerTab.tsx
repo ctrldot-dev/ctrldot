@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { guiClient } from '../adapters/GuiClient.js';
 import LedgerEntryDetails from './LedgerEntryDetails.js';
 
-export default function LedgerTab() {
+type LedgerTabProps = {
+  contextNamespaceId: string | null;
+};
+
+export default function LedgerTab({ contextNamespaceId }: LedgerTabProps) {
   const [timeline, setTimeline] = useState<Array<{
     id: string;
     seq: number;
@@ -18,14 +22,19 @@ export default function LedgerTab() {
   const [selectedEntry, setSelectedEntry] = useState<typeof timeline[0] | null>(null);
 
   useEffect(() => {
+    if (!contextNamespaceId) {
+      setTimeline([]);
+      return;
+    }
     loadHistory();
-  }, [mode]);
+  }, [contextNamespaceId, mode]);
 
   const loadHistory = async () => {
+    if (!contextNamespaceId) return;
     setLoading(true);
     setError(null);
     try {
-      const target = mode === 'whole' ? undefined : undefined; // TODO: support node filtering
+      const target = mode === 'whole' ? contextNamespaceId : contextNamespaceId;
       const result = await guiClient.ledger(target, 100);
       setTimeline(result.timeline);
     } catch (err) {

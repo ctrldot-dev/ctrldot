@@ -9,7 +9,8 @@ import (
 	"github.com/futurematic/kernel/internal/domain"
 )
 
-// GetActivePolicySet retrieves the active policy set for a namespace
+// GetActivePolicySet retrieves the active policy set for a namespace.
+// Exact namespace_id match is tried first; if none, the longest prefix match is used.
 func (t *PostgresTx) GetActivePolicySet(ctx context.Context, namespaceID string) (*domain.PolicySet, error) {
 	var policySet domain.PolicySet
 	var createdAt time.Time
@@ -18,8 +19,9 @@ func (t *PostgresTx) GetActivePolicySet(ctx context.Context, namespaceID string)
 	err := t.tx.QueryRowContext(ctx,
 		`SELECT policy_set_id, namespace_id, policy_yaml, policy_hash, created_at, created_seq, retired_seq
 		 FROM policy_sets
-		 WHERE namespace_id = $1 AND is_active = TRUE AND retired_seq IS NULL
-		 ORDER BY created_seq DESC
+		 WHERE is_active = TRUE AND retired_seq IS NULL
+		   AND (namespace_id = $1 OR $1 LIKE namespace_id || ':%' OR $1 LIKE namespace_id || '/%')
+		 ORDER BY length(namespace_id) DESC
 		 LIMIT 1`,
 		namespaceID,
 	).Scan(&policySet.ID, &policySet.NamespaceID, &policySet.PolicyYAML, &policySet.PolicyHash, &createdAt, &policySet.CreatedSeq, &retiredSeq)

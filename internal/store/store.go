@@ -71,4 +71,8 @@ type Tx interface {
 	// Policy Sets
 	GetActivePolicySet(ctx context.Context, namespaceID string) (*domain.PolicySet, error)
 	StorePolicySet(ctx context.Context, policySet domain.PolicySet, seq int64) error
+
+	// Namespace listing (for UI)
+	ListNamespaceIDsWithNodes(ctx context.Context, asofSeq int64) ([]string, error)
+	GetNamespaceRoot(ctx context.Context, namespaceID string, asofSeq int64) (nodeID, title, role string, err error)
 }

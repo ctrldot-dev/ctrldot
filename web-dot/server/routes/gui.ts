@@ -2,10 +2,20 @@ import express from 'express';
 import { config } from '../config.js';
 import { kernelFetchJson } from '../kernelClient.js';
 import { getDescription } from '../descriptions.js';
+import { getNarratives, getNarrative } from '../narratives.js';
+
+type NamespaceOption = {
+  id: string;
+  label: string;
+  root_node_id: string;
+  prefix: string;
+};
+
+type RoleAssignmentVM = { node_id: string; role: string; meta?: Record<string, unknown> };
 
 type ExpandResult = {
   nodes: Array<{ node_id: string; title: string; meta?: Record<string, unknown> }>;
-  role_assignments: Array<{ node_id: string; role: string }>;
+  role_assignments: RoleAssignmentVM[];
   links: Array<{ from_node_id: string; to_node_id: string; type: string; link_id: string }>;
   materials: Array<{ material_id: string; node_id: string; content_ref: string; media_type: string; meta?: Record<string, unknown> }>;
 };
@@ -20,15 +30,94 @@ function rolesByNode(roleAssignments: ExpandResult['role_assignments']): Map<str
   return m;
 }
 
+/** Role assignments with meta (for Fin.Policy policy_kind). */
+function roleAssignmentsWithMeta(roleAssignments: ExpandResult['role_assignments']): Map<string, RoleAssignmentVM[]> {
+  const m = new Map<string, RoleAssignmentVM[]>();
+  for (const ra of roleAssignments) {
+    const arr = m.get(ra.node_id) || [];
+    arr.push(ra);
+    m.set(ra.node_id, arr);
+  }
+  return m;
+}
+
+function isProductLedgerNamespace(namespaceId: string): boolean {
+  return namespaceId.startsWith('ProductLedger:');
+}
+
+function isFinLedgerNamespace(namespaceId: string): boolean {
+  return namespaceId.startsWith('FinLedger:');
+}
+
+/** Product intent roles (and legacy EnterpriseIntent.*). */
+const PRODUCT_SO_ROLES = ['Product.StrategicObjective', 'EnterpriseIntent.StrategicObjective'];
+const PRODUCT_AO_ROLES = ['Product.AssuranceObligation', 'EnterpriseIntent.AssuranceObligation'];
+const PRODUCT_TT_ROLES = ['Product.TransformationTheme', 'EnterpriseIntent.TransformationTheme'];
+
+function hasRole(nodeRoles: string[], roleSet: string[]): boolean {
+  return nodeRoles.some((r) => roleSet.some((allowed) => r === allowed || r.endsWith(allowed)));
+}
+
+/** Section key for grouping intents. */
+type IntentSectionKey = 'strategic_objectives' | 'assurance_obligations' | 'transformation_themes' | 'policies';
+
 export const guiRoutes = express.Router();
 
-// v0.2: GUI config (pinned roots)
+// v0.2: GUI config (pinned roots + available namespaces)
 guiRoutes.get('/config', (req, res) => {
+  const nsEntry = config.availableNamespaces.find((n) => n.id === config.namespace);
+  const label = nsEntry?.label ?? config.pinnedRoots.label;
   res.json({
-    label: config.pinnedRoots.label,
-    namespace_id: config.namespace, // optional; spec says don't show in main UI, but handy for debugging
+    label,
+    namespace_id: config.namespace,
     pinned_roots: config.pinnedRoots,
+    available_namespaces: config.availableNamespaces,
   });
+});
+
+// Ledger / Namespace browser: list namespaces from kernel only (WI-4.4: load only explicitly defined demo content)
+guiRoutes.get('/namespaces', async (req, res) => {
+  try {
+    const list = await kernelFetchJson<{ namespace_ids: string[] }>('/v1/namespaces', {
+      query: {},
+      skipNamespaceInject: true,
+    });
+    const namespaces: NamespaceOption[] = [];
+    for (const id of list.namespace_ids || []) {
+      try {
+        const root = await kernelFetchJson<{ node_id: string; title: string; role: string }>('/v1/namespace_root', {
+          query: { namespace_id: id },
+          skipNamespaceInject: true,
+        });
+        const prefix = id.includes(':') ? id.split(':')[0]! : id;
+        namespaces.push({
+          id,
+          label: root.title || id,
+          root_node_id: root.node_id,
+          prefix,
+        });
+      } catch {
+        // No root (e.g. empty namespace) — still list with id as label
+        const prefix = id.includes(':') ? id.split(':')[0]! : id;
+        namespaces.push({ id, label: id, root_node_id: '', prefix });
+      }
+    }
+    namespaces.sort((a, b) => a.id.localeCompare(b.id));
+    // Group by prefix for UI
+    const grouped = namespaces.reduce<Record<string, NamespaceOption[]>>((acc, ns) => {
+      const p = ns.prefix || 'Other';
+      if (!acc[p]) acc[p] = [];
+      acc[p].push(ns);
+      return acc;
+    }, {});
+    res.json({ namespaces, grouped: grouped });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const hint = msg.includes('fetch') || msg.includes('ECONNREFUSED')
+      ? ' (Is the kernel running on the configured KERNEL_URL?)'
+      : '';
+    res.status(503).json({ error: msg + hint });
+  }
 });
 
 // v0.2: connection indicator (kernel reachable)
@@ -41,13 +130,40 @@ guiRoutes.get('/healthz', async (req, res) => {
   }
 });
 
-// v0.2: Products tree view model (CONTAINS only)
+// v0.2: Incident narratives (WI-1.7)
+guiRoutes.get('/narratives', (req, res) => {
+  try {
+    const list = getNarratives();
+    res.json({ narratives: list });
+  } catch (e) {
+    console.error('GET /api/narratives:', e);
+    res.status(500).json({ error: 'Failed to load narratives', detail: String(e) });
+  }
+});
+guiRoutes.get('/narratives/:id', (req, res) => {
+  try {
+    const n = getNarrative(req.params.id);
+    if (!n) return res.status(404).json({ error: 'Narrative not found' });
+    res.json(n);
+  } catch (e) {
+    console.error('GET /api/narratives/:id:', e);
+    res.status(500).json({ error: 'Failed to load narrative', detail: String(e) });
+  }
+});
+
+// v0.2: Products tree view model (CONTAINS only). Supports namespace_id for tabbed ledgers.
 guiRoutes.get('/products/tree', async (req, res) => {
   const root = (req.query.root as string) || config.pinnedRoots.products.fieldServe;
   const depth = Number(req.query.depth || 10);
+  const namespaceId = (req.query.namespace_id as string) || config.namespace;
+
+  if (!root?.trim()) {
+    res.status(400).json({ error: 'root is required (use namespace list from /api/namespaces)' });
+    return;
+  }
 
   const expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
-    query: { ids: root, depth },
+    query: { ids: root, depth, namespace_id: namespaceId },
   });
 
   const nodeById = new Map(expand.nodes.map((n) => [n.node_id, n]));
@@ -137,13 +253,14 @@ guiRoutes.get('/products/tree', async (req, res) => {
   });
 });
 
-// v0.2: Node detail view model for Details drawer
+// v0.2: Node detail view model for Details drawer. Supports namespace_id for tabbed ledgers.
 guiRoutes.get('/node/:nodeId', async (req, res) => {
   const nodeId = req.params.nodeId;
   const depth = Number(req.query.depth || 1);
+  const namespaceId = (req.query.namespace_id as string) || config.namespace;
 
   const expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
-    query: { ids: nodeId, depth },
+    query: { ids: nodeId, depth, namespace_id: namespaceId },
   });
 
   const nodeById = new Map(expand.nodes.map((n) => [n.node_id, n]));
@@ -206,6 +323,15 @@ guiRoutes.get('/node/:nodeId', async (req, res) => {
   const alignment = relatedDeduped.filter((r) => alignmentTypes.has(r.type));
   const coherence = relatedDeduped.filter((r) => coherenceTypes.has(r.type));
   const decisionsAndEvidence = relatedDeduped.filter((r) => decisionTypes.has(r.type));
+  const childIds = new Set(children.map((c) => c.node_id));
+  // All other link types: CONTAINS incoming (parent), and any type not in alignment/coherence/decisions (exclude CONTAINS outgoing, already in children)
+  const other = relatedDeduped.filter(
+    (r) =>
+      !alignmentTypes.has(r.type) &&
+      !coherenceTypes.has(r.type) &&
+      !decisionTypes.has(r.type) &&
+      !(r.type === 'CONTAINS' && childIds.has(r.node_id))
+  );
 
   const materials = expand.materials
     .filter((m) => m.node_id === nodeId)
@@ -226,27 +352,41 @@ guiRoutes.get('/node/:nodeId', async (req, res) => {
       alignment,
       coherence,
       decisions_and_evidence: decisionsAndEvidence,
+      other,
       materials,
     },
   });
 });
 
-// v0.2: Intent view model (SO/AO/TT with connections)
+// v0.2: Intent view model by ledger type. Discovers intent nodes by querying nodes by role within the selected namespace/root.
+// Product ledger: Product.StrategicObjective, Product.AssuranceObligation, Product.TransformationTheme (and EnterpriseIntent.*).
+// Fin ledger: Fin.Objective (SO), Fin.Policy (AO), Policies (Fin.Policy with meta.policy_kind == "operational_controls" or all Fin.Policy).
 guiRoutes.get('/intent', async (req, res) => {
-  const intentIds = [
-    config.pinnedRoots.intent.so1,
-    config.pinnedRoots.intent.ao1,
-    config.pinnedRoots.intent.tt1,
-  ];
+  const namespaceId = (req.query.namespace_id as string) || config.namespace;
 
-  const expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
-    query: { ids: intentIds.join(','), depth: 2 },
-  });
+  let expand: ExpandResult;
+  try {
+    const rootResp = await kernelFetchJson<{ node_id: string; title: string; role: string }>('/v1/namespace_root', {
+      query: { namespace_id: namespaceId },
+      skipNamespaceInject: true,
+    });
+    const rootId = rootResp?.node_id;
+    if (!rootId) {
+      res.json({ sections: [], intents: [] });
+      return;
+    }
+    expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
+      query: { ids: rootId, depth: 5, namespace_id: namespaceId },
+    });
+  } catch {
+    res.json({ sections: [], intents: [] });
+    return;
+  }
 
   const nodeById = new Map(expand.nodes.map((n) => [n.node_id, n]));
   const roles = rolesByNode(expand.role_assignments);
+  const rolesWithMeta = roleAssignmentsWithMeta(expand.role_assignments);
 
-  // De-dupe links
   const uniqueLinks = (() => {
     const seen = new Set<string>();
     const out: ExpandResult['links'] = [];
@@ -258,16 +398,35 @@ guiRoutes.get('/intent', async (req, res) => {
     return out;
   })();
 
-  const intentNodes = intentIds
-    .map((id) => {
-      const node = nodeById.get(id);
-      if (!node) return null;
+  type IntentNode = {
+    node_id: string;
+    title: string;
+    roles: string[];
+    section: IntentSectionKey;
+    connections: Array<{ type: string; node_id: string; title: string; roles: string[] }>;
+  };
 
-      // Get connections (links where this intent is involved)
+  const intentNodesBySection = new Map<IntentSectionKey, IntentNode[]>();
+  const sections: Array<{ key: IntentSectionKey; label: string }> = [];
+
+  if (isProductLedgerNamespace(namespaceId)) {
+    sections.push(
+      { key: 'strategic_objectives', label: 'Strategic Objectives' },
+      { key: 'assurance_obligations', label: 'Assurance Obligations' },
+      { key: 'transformation_themes', label: 'Transformation Themes' }
+    );
+    for (const n of expand.nodes) {
+      const nodeRoles = roles.get(n.node_id) || [];
+      let section: IntentSectionKey | null = null;
+      if (hasRole(nodeRoles, PRODUCT_SO_ROLES)) section = 'strategic_objectives';
+      else if (hasRole(nodeRoles, PRODUCT_AO_ROLES)) section = 'assurance_obligations';
+      else if (hasRole(nodeRoles, PRODUCT_TT_ROLES)) section = 'transformation_themes';
+      if (!section) continue;
+
       const connections = uniqueLinks
-        .filter((l) => l.from_node_id === id || l.to_node_id === id)
+        .filter((l) => l.from_node_id === n.node_id || l.to_node_id === n.node_id)
         .map((l) => {
-          const otherId = l.from_node_id === id ? l.to_node_id : l.from_node_id;
+          const otherId = l.from_node_id === n.node_id ? l.to_node_id : l.from_node_id;
           const other = nodeById.get(otherId);
           if (!other) return null;
           return {
@@ -277,23 +436,81 @@ guiRoutes.get('/intent', async (req, res) => {
             roles: roles.get(other.node_id) || [],
           };
         })
-        .filter(Boolean) as Array<{ type: string; node_id: string; title: string; roles: string[] }>;
-
-      // Dedupe connections
+        .filter(Boolean) as IntentNode['connections'];
       const deduped = connections.filter(
         (item, idx, arr) => arr.findIndex((x) => x.type === item.type && x.node_id === item.node_id) === idx
       );
 
-      return {
-        node_id: node.node_id,
-        title: node.title,
-        roles: roles.get(node.node_id) || [],
+      const intent: IntentNode = {
+        node_id: n.node_id,
+        title: n.title,
+        roles: nodeRoles,
+        section,
         connections: deduped,
       };
-    })
-    .filter(Boolean);
+      const arr = intentNodesBySection.get(section) || [];
+      arr.push(intent);
+      intentNodesBySection.set(section, arr);
+    }
+  } else if (isFinLedgerNamespace(namespaceId)) {
+    sections.push(
+      { key: 'strategic_objectives', label: 'Strategic Objectives' },
+      { key: 'assurance_obligations', label: 'Assurance Obligations' },
+      { key: 'policies', label: 'Policies' }
+    );
+    for (const n of expand.nodes) {
+      const nodeRoles = roles.get(n.node_id) || [];
+      const sectionsForNode: IntentSectionKey[] = [];
+      if (nodeRoles.includes('Fin.Objective')) sectionsForNode.push('strategic_objectives');
+      if (nodeRoles.includes('Fin.Policy')) {
+        sectionsForNode.push('assurance_obligations');
+        sectionsForNode.push('policies');
+      }
+      if (sectionsForNode.length === 0) continue;
 
-  res.json({ intents: intentNodes });
+      const connections = uniqueLinks
+        .filter((l) => l.from_node_id === n.node_id || l.to_node_id === n.node_id)
+        .map((l) => {
+          const otherId = l.from_node_id === n.node_id ? l.to_node_id : l.from_node_id;
+          const other = nodeById.get(otherId);
+          if (!other) return null;
+          return {
+            type: l.type,
+            node_id: other.node_id,
+            title: other.title,
+            roles: roles.get(other.node_id) || [],
+          };
+        })
+        .filter(Boolean) as IntentNode['connections'];
+      const deduped = connections.filter(
+        (item, idx, arr) => arr.findIndex((x) => x.type === item.type && x.node_id === item.node_id) === idx
+      );
+
+      const intent: IntentNode = {
+        node_id: n.node_id,
+        title: n.title,
+        roles: nodeRoles,
+        section: sectionsForNode[0]!,
+        connections: deduped,
+      };
+      for (const section of sectionsForNode) {
+        const arr = intentNodesBySection.get(section) || [];
+        arr.push({ ...intent, section });
+        intentNodesBySection.set(section, arr);
+      }
+    }
+  } else {
+    res.json({ sections: [], intents: [] });
+    return;
+  }
+
+  const intents: IntentNode[] = [];
+  for (const s of sections) {
+    const list = intentNodesBySection.get(s.key) || [];
+    for (const i of list) intents.push(i);
+  }
+
+  res.json({ sections, intents });
 });
 
 // v0.2: Ledger timeline view model
@@ -342,18 +559,79 @@ guiRoutes.get('/ledger', async (req, res) => {
   res.json({ timeline });
 });
 
-// v0.2: Materials index (filesystem-like view)
+// v0.2: Materials index (filesystem-like view). Optional namespace_id and root scope to that subtree.
+// When namespace_id is set but root is missing, discovers the namespace root so materials for that namespace are shown.
 guiRoutes.get('/materials', async (req, res) => {
-  // For now, get all materials by expanding all nodes in namespace
-  // This is inefficient but works for demo. In production, we'd want a dedicated materials query.
-  const allProductNodes = [config.pinnedRoots.products.fieldServe, config.pinnedRoots.products.assetLink];
-  
-  const expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
-    query: { ids: allProductNodes.join(','), depth: 10 },
-  });
+  const namespaceId = req.query.namespace_id as string | undefined;
+  let rootId = req.query.root as string | undefined;
+
+  // When we have namespace but no root, get the namespace root so we can list materials in that namespace
+  if (namespaceId && !rootId) {
+    try {
+      const rootResp = await kernelFetchJson<{ node_id: string; title: string; role: string }>('/v1/namespace_root', {
+        query: { namespace_id: namespaceId },
+        skipNamespaceInject: true,
+      });
+      rootId = rootResp?.node_id || undefined;
+    } catch {
+      rootId = undefined;
+    }
+  }
+
+  let allNodeIds: Set<string>;
+  if (namespaceId && rootId) {
+    // Context-scoped: expand from root in that namespace
+    const expandFromRoot = await kernelFetchJson<ExpandResult>('/v1/expand', {
+      query: { ids: rootId, depth: 10, namespace_id: namespaceId },
+    });
+    allNodeIds = new Set(expandFromRoot.nodes.map((n) => n.node_id));
+  } else {
+    // Default: config-based roots (may be empty after Product Ledger split; nav provides root/namespace)
+    const productRoots = [
+      config.pinnedRoots.products.fieldServe,
+      config.pinnedRoots.products.assetLink,
+    ].filter(Boolean);
+    const intentRoots = [
+      config.pinnedRoots.intent.so1,
+      config.pinnedRoots.intent.ao1,
+      config.pinnedRoots.intent.tt1,
+    ].filter(Boolean);
+    const idsToExpand = [...productRoots, ...intentRoots];
+    if (idsToExpand.length === 0) {
+      allNodeIds = new Set();
+    } else {
+      const expandProducts = await kernelFetchJson<ExpandResult>('/v1/expand', {
+        query: {
+          ids: productRoots.length ? productRoots.join(',') : intentRoots.join(','),
+          depth: 10,
+          namespace_id: config.namespace,
+        },
+      });
+      allNodeIds = new Set(expandProducts.nodes.map((n) => n.node_id));
+      intentRoots.forEach((id) => allNodeIds.add(id));
+    }
+  }
+
+  const allMaterials: ExpandResult['materials'] = [];
+  const seenMaterials = new Set<string>();
+  const nodeArray = Array.from(allNodeIds);
+  const nsForExpand = namespaceId || config.namespace;
+
+  for (let i = 0; i < nodeArray.length; i += 50) {
+    const batch = nodeArray.slice(i, i + 50);
+    const expand = await kernelFetchJson<ExpandResult>('/v1/expand', {
+      query: { ids: batch.join(','), depth: 0, namespace_id: nsForExpand },
+    });
+    for (const m of expand.materials) {
+      if (!seenMaterials.has(m.material_id)) {
+        seenMaterials.add(m.material_id);
+        allMaterials.push(m);
+      }
+    }
+  }
 
   // Group materials by category (from meta or media_type)
-  const materials = expand.materials.map((m) => ({
+  const materials = allMaterials.map((m) => ({
     material_id: m.material_id,
     node_id: m.node_id,
     title: (m.meta?.title as string) || m.content_ref.split('/').pop() || m.material_id,

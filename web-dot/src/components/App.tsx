@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { guiClient } from '../adapters/GuiClient.js';
-import ProductsTab from './ProductsTab.js';
+import type { NodeVM } from '../adapters/GuiClient.js';
+import LedgerTreeNav from './LedgerTreeNav.js';
 import IntentTab from './IntentTab.js';
 import LedgerTab from './LedgerTab.js';
 import MaterialsTab from './MaterialsTab.js';
+import ExplorerTab from './ExplorerTab.js';
 import MarkdownViewer from './MarkdownViewer.js';
 import ConnectionIndicator from './ConnectionIndicator.js';
+import DetailsDrawer from './DetailsDrawer.js';
 
-type Tab = 'products' | 'intent' | 'ledger' | 'materials';
+type ViewTab = 'intent' | 'ledger' | 'materials' | 'explorer';
 type ToolTab = {
   id: string;
   title: string;
@@ -21,13 +24,41 @@ type ToolTab = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('products');
+  const [activeTab, setActiveTab] = useState<ViewTab>('intent');
   const [connected, setConnected] = useState(false);
   const [toolTabs, setToolTabs] = useState<ToolTab[]>([]);
   const [activeToolTab, setActiveToolTab] = useState<string | null>(null);
+  const [pendingProductsNodeId, setPendingProductsNodeId] = useState<string | null>(null);
+
+  // Navigation context: the node selected in the left nav; drives Intent / Ledger / Materials
+  const [contextNodeId, setContextNodeId] = useState<string | null>(null);
+  const [contextNamespaceId, setContextNamespaceId] = useState<string | null>(null);
+  // Inspector: the node whose details are shown in the Details pane (passive)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNamespaceId, setSelectedNamespaceId] = useState<string | null>(null);
+  const [nodeDetails, setNodeDetails] = useState<NodeVM | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleSelectNode = (nodeId: string, namespaceId: string) => {
+    const nodeIdOrNull = nodeId || null;
+    setContextNodeId(nodeIdOrNull);
+    setContextNamespaceId(namespaceId);
+    setSelectedNodeId(nodeIdOrNull);
+    setSelectedNamespaceId(namespaceId);
+    setNodeDetails(null);
+    if (nodeIdOrNull) {
+      setLoadingDetails(true);
+      guiClient
+        .node(nodeIdOrNull, namespaceId)
+        .then(setNodeDetails)
+        .catch(() => setNodeDetails(null))
+        .finally(() => setLoadingDetails(false));
+    } else {
+      setLoadingDetails(false);
+    }
+  };
 
   useEffect(() => {
-    // Check connection on mount
     const checkConnection = async () => {
       try {
         const result = await guiClient.healthz();
@@ -42,7 +73,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Listen for openMaterial events from MaterialsTab
     const handleOpenMaterial = (event: Event) => {
       const customEvent = event as CustomEvent<{
         material_id: string;
@@ -52,9 +82,7 @@ export default function App() {
         media_type: string;
       }>;
       const material = customEvent.detail;
-      
-      // Check if tool tab already exists
-      const existing = toolTabs.find(t => t.material.material_id === material.material_id);
+      const existing = toolTabs.find((t) => t.material.material_id === material.material_id);
       if (existing) {
         setActiveToolTab(existing.id);
       } else {
@@ -63,21 +91,25 @@ export default function App() {
           title: material.title,
           material,
         };
-        setToolTabs([...toolTabs, newTab]);
+        setToolTabs((prev) => [...prev, newTab]);
         setActiveToolTab(newTab.id);
       }
     };
 
-    // Listen for openInTab events from Details drawer
     const handleOpenInTab = (event: Event) => {
       const customEvent = event as CustomEvent<{
-        tab: Tab;
+        tab: ViewTab | 'products';
         nodeId: string;
       }>;
       const { tab, nodeId } = customEvent.detail;
-      setActiveTab(tab);
-      // Dispatch to the specific tab component to handle navigation
-      window.dispatchEvent(new CustomEvent(`navigateToNode:${tab}`, { detail: { nodeId } }));
+      if (tab === 'products') {
+        setPendingProductsNodeId(nodeId);
+        window.dispatchEvent(new CustomEvent('navigateToNode:products', { detail: { nodeId } }));
+      } else {
+        setActiveTab(tab);
+        setActiveToolTab(null);
+        window.dispatchEvent(new CustomEvent(`navigateToNode:${tab}`, { detail: { nodeId } }));
+      }
     };
 
     window.addEventListener('openMaterial', handleOpenMaterial);
@@ -89,104 +121,138 @@ export default function App() {
   }, [toolTabs]);
 
   const closeToolTab = (tabId: string) => {
-    setToolTabs(toolTabs.filter(t => t.id !== tabId));
+    setToolTabs((prev) => prev.filter((t) => t.id !== tabId));
     if (activeToolTab === tabId) {
-      setActiveToolTab(toolTabs.length > 1 ? toolTabs.find(t => t.id !== tabId)?.id || null : null);
+      setActiveToolTab(toolTabs.length > 1 ? toolTabs.find((t) => t.id !== tabId)?.id ?? null : null);
     }
   };
 
-  const activeToolTabData = toolTabs.find(t => t.id === activeToolTab);
+  const activeToolTabData = toolTabs.find((t) => t.id === activeToolTab);
+
+  const handleCloseDrawer = () => {
+    setSelectedNodeId(null);
+    setSelectedNamespaceId(null);
+    setNodeDetails(null);
+  };
+  const hasContext = contextNamespaceId != null;
 
   return (
     <div id="app">
       <div className="header">
-        <h1>Product Ledger Demo</h1>
+        <h1>Decision Ledger Demo</h1>
         <ConnectionIndicator connected={connected} />
       </div>
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'products' ? 'active' : ''}`}
-          onClick={() => setActiveTab('products')}
-        >
-          Products
-        </button>
-        <button
-          className={`tab ${activeTab === 'intent' ? 'active' : ''}`}
-          onClick={() => setActiveTab('intent')}
-        >
-          Intent
-        </button>
-        <button
-          className={`tab ${activeTab === 'ledger' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ledger')}
-        >
-          Ledger
-        </button>
-        <button
-          className={`tab ${activeTab === 'materials' ? 'active' : ''}`}
-          onClick={() => setActiveTab('materials')}
-        >
-          Materials
-        </button>
-      </div>
-      <div style={{ display: 'flex', height: 'calc(100vh - 120px)' }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div className="content" style={{ flex: 1 }}>
-            {activeTab === 'products' && <ProductsTab />}
-            {activeTab === 'intent' && <IntentTab />}
-            {activeTab === 'ledger' && <LedgerTab />}
-            {activeTab === 'materials' && <MaterialsTab />}
-          </div>
-        </div>
-        {toolTabs.length > 0 && (
-          <div style={{ width: '600px', borderLeft: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e0e0e0', overflowX: 'auto' }}>
-              {toolTabs.map((tab) => (
-                <div
-                  key={tab.id}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRight: '1px solid #e0e0e0',
-                    background: activeToolTab === tab.id ? '#e3f2fd' : 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    minWidth: '150px',
-                  }}
-                  onClick={() => setActiveToolTab(tab.id)}
+      <div style={{ display: 'flex', height: 'calc(100vh - 56px)' }}>
+        <aside style={{ width: '360px', minWidth: '320px', flexShrink: 0, borderRight: '1px solid #e0e0e0' }}>
+          <LedgerTreeNav
+            selectedNodeId={selectedNodeId}
+            contextNamespaceId={contextNamespaceId}
+            onSelectNode={handleSelectNode}
+            pendingNodeId={pendingProductsNodeId}
+            onClearPendingNavigation={() => setPendingProductsNodeId(null)}
+          />
+        </aside>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div className="tabs">
+            <button
+              className={`tab ${activeTab === 'intent' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('intent'); setActiveToolTab(null); }}
+            >
+              Intent
+            </button>
+            <button
+              className={`tab ${activeTab === 'ledger' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('ledger'); setActiveToolTab(null); }}
+            >
+              Ledger
+            </button>
+            <button
+              className={`tab ${activeTab === 'materials' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('materials'); setActiveToolTab(null); }}
+            >
+              Materials
+            </button>
+            <button
+              className={`tab ${activeTab === 'explorer' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('explorer'); setActiveToolTab(null); }}
+            >
+              Explorer
+            </button>
+            {toolTabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`tab ${activeToolTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveToolTab(tab.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <span style={{ flex: 1, fontSize: '0.875rem' }}>{tab.title}</span>
+                <span
+                  onClick={(e) => { e.stopPropagation(); closeToolTab(tab.id); }}
+                  style={{ fontSize: '1rem', lineHeight: 1, paddingLeft: '0.25rem', cursor: 'pointer' }}
                 >
-                  <span style={{ flex: 1, fontSize: '0.875rem' }}>{tab.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeToolTab(tab.id);
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      lineHeight: 1,
-                      padding: 0,
-                      width: '20px',
-                      height: '20px',
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            {activeToolTabData && (
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <MarkdownViewer
-                  material={activeToolTabData.material}
-                  onClose={() => closeToolTab(activeToolTabData.id)}
-                />
+                  ×
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="content" style={{ flex: 1, overflow: 'auto' }}>
+            {!hasContext && !activeToolTab && activeTab !== 'explorer' && (
+              <div style={{ padding: '2rem', color: '#666', textAlign: 'center' }}>
+                <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+                  Select a node in the left nav to view Intent, Ledger, and Materials for that context.
+                </p>
+                <p style={{ fontSize: '0.875rem' }}>
+                  The left nav shows all root ledgers (Product, Treasury, Stablecoin, etc.). Click any node to set it as the active context and re-root the main content.
+                </p>
               </div>
             )}
+            {hasContext && !activeToolTab && activeTab === 'intent' && (
+              <IntentTab contextNamespaceId={contextNamespaceId} />
+            )}
+            {hasContext && !activeToolTab && activeTab === 'ledger' && (
+              <LedgerTab contextNamespaceId={contextNamespaceId} />
+            )}
+            {hasContext && !activeToolTab && activeTab === 'materials' && (
+              <MaterialsTab contextNodeId={contextNodeId} contextNamespaceId={contextNamespaceId} />
+            )}
+            {!activeToolTab && activeTab === 'explorer' && (
+              <ExplorerTab contextNodeId={contextNodeId} contextNamespaceId={contextNamespaceId} />
+            )}
+            {activeToolTab && activeToolTabData && (
+              <MarkdownViewer
+                material={activeToolTabData.material}
+                onClose={() => closeToolTab(activeToolTabData!.id)}
+              />
+            )}
           </div>
+        </main>
+        {selectedNodeId && (
+          <>
+            {loadingDetails && (
+              <div
+                style={{
+                  width: '400px',
+                  minWidth: '400px',
+                  borderLeft: '1px solid #e0e0e0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '2rem',
+                }}
+              >
+                <div className="loading">Loading details...</div>
+              </div>
+            )}
+            {!loadingDetails && (
+              <DetailsDrawer
+                nodeData={nodeDetails}
+                onClose={handleCloseDrawer}
+                onOpenInTab={(tab, nodeId) =>
+                  window.dispatchEvent(new CustomEvent('openInTab', { detail: { tab, nodeId } }))
+                }
+              />
+            )}
+          </>
         )}
       </div>
     </div>

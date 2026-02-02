@@ -1,0 +1,36 @@
+# Financial Ledger policy set — namespace-scoped for FinLedger:*
+# Validates role assignments and links in FinLedger namespaces only.
+# Do not merge with Product Ledger policy set.
+
+policy_set: financialledger
+version: "1"
+applies_to:
+  namespace: "FinLedger:*"
+
+rules:
+  # CONTAINS hierarchy: allowed role edges and single parent per child
+  - id: fl-contains-role-edge
+    when:
+      op: [CreateLink]
+      link_type: CONTAINS
+    require:
+      - predicate: role_edge_allowed
+        args:
+          parent_role: [LedgerRoot, LedgerAccount, ReservePool, TreasuryAccount]
+          child_role: [LedgerAccount, SubAccount, ReserveAsset, TreasuryAccount, Fin.Objective, Fin.Policy]
+    effect:
+      deny: "CONTAINS link not allowed for this parent/child role combination"
+
+  # Single parent per SubAccount (warn only so seed can run; tighten to deny when ready)
+  - id: fl-contains-single-parent
+    when:
+      op: [CreateLink]
+      link_type: CONTAINS
+    require:
+      - predicate: child_has_only_one_parent
+        args:
+          link_type: CONTAINS
+          child_role: SubAccount
+    effect:
+      deny: "Child already has a parent in this namespace"
+

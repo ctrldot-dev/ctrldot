@@ -78,7 +78,9 @@ func (s *PostgresStore) ResolveAsOf(ctx context.Context, asof domain.AsOf) (int6
 	return seq, nil
 }
 
-// GetActivePolicySet retrieves the active policy set for a namespace
+// GetActivePolicySet retrieves the active policy set for a namespace.
+// Exact namespace_id match is tried first; if none, the longest prefix match is used
+// (e.g. namespace_id "FinLedger" applies to "FinLedger:/Kesteron/Treasury").
 func (s *PostgresStore) GetActivePolicySet(ctx context.Context, namespaceID string) (*domain.PolicySet, error) {
 	var policySet domain.PolicySet
 	var createdAt time.Time
@@ -87,8 +89,9 @@ func (s *PostgresStore) GetActivePolicySet(ctx context.Context, namespaceID stri
 	err := s.db.QueryRowContext(ctx,
 		`SELECT policy_set_id, namespace_id, policy_yaml, policy_hash, created_at, created_seq, retired_seq
 		 FROM policy_sets
-		 WHERE namespace_id = $1 AND is_active = TRUE AND retired_seq IS NULL
-		 ORDER BY created_seq DESC
+		 WHERE is_active = TRUE AND retired_seq IS NULL
+		   AND (namespace_id = $1 OR $1 LIKE namespace_id || ':%' OR $1 LIKE namespace_id || '/%')
+		 ORDER BY length(namespace_id) DESC
 		 LIMIT 1`,
 		namespaceID,
 	).Scan(&policySet.ID, &policySet.NamespaceID, &policySet.PolicyYAML, &policySet.PolicyHash, &createdAt, &policySet.CreatedSeq, &retiredSeq)

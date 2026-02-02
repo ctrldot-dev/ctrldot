@@ -19,10 +19,21 @@ docker-up:
 docker-down:
 	docker-compose down
 
-# Run migrations
+# Run migrations (init + FinLedger namespaces)
 migrate:
 	@echo "Running migrations..."
 	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f migrations/0001_init.sql
+	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f migrations/0002_finledger_namespaces.sql
+
+# Register Financial Ledger policy set for FinLedger:* (run after migrate; kernel need not be running)
+bootstrap-finledger:
+	@echo "Registering financialledger-policyset for FinLedger:*..."
+	@DB_URL=$(DB_URL) go run ./cmd/bootstrap_finledger
+
+# Ingest FinLedger seed graphs (kernel must be running)
+seed-finledger:
+	@echo "Ingesting FinLedger seed graphs..."
+	@KERNEL_URL=$${KERNEL_URL:-http://localhost:8080} go run ./cmd/seed_finledger kesteron-treasury-finledger-seed.yaml kesteron-stablecoinreserves-finledger-seed.yaml
 
 # Run kernel service
 dev: docker-up

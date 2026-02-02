@@ -1,6 +1,6 @@
 package main
 
-import "futurematic/internal/dotcli/cmd"
+import "github.com/futurematic/kernel/scaffold/internal/dotcli/cmd"
 
 func main() {
 	cmd.Execute()

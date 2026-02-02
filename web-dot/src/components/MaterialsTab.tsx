@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { guiClient } from '../adapters/GuiClient.js';
 
-export default function MaterialsTab() {
+type MaterialsTabProps = {
+  contextNodeId: string | null;
+  contextNamespaceId: string | null;
+};
+
+export default function MaterialsTab({ contextNodeId, contextNamespaceId }: MaterialsTabProps) {
   const [categories, setCategories] = useState<Array<{
     category: string;
     items: Array<{
@@ -27,14 +32,19 @@ export default function MaterialsTab() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!contextNamespaceId) {
+      setCategories([]);
+      return;
+    }
     loadMaterials();
-  }, []);
+  }, [contextNodeId, contextNamespaceId]);
 
   const loadMaterials = async () => {
+    if (!contextNamespaceId) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await guiClient.materials();
+      const result = await guiClient.materials(contextNamespaceId, contextNodeId ?? undefined);
       setCategories(result.categories);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load materials');
@@ -121,7 +131,16 @@ export default function MaterialsTab() {
         {loading && <div className="loading">Loading materials...</div>}
         {error && <div className="error">Error: {error}</div>}
         {!loading && !error && filteredCategories.length === 0 && (
-          <div className="loading">No materials found{searchQuery || selectedCategory ? ' matching filters' : ''}</div>
+          <div style={{ padding: '1rem', color: '#555' }}>
+            <p style={{ marginBottom: '0.5rem' }}>
+              No materials found{searchQuery || selectedCategory ? ' matching filters' : ''}.
+            </p>
+            {contextNamespaceId && (
+              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                Materials are stored in the kernel and linked to nodes. To add materials for this namespace, run the materials seed script (e.g. <code style={{ fontSize: '0.8rem', background: '#f0f0f0', padding: '0.125rem 0.25rem' }}>seed-kesteron-materials.sh</code>) with <code style={{ fontSize: '0.8rem', background: '#f0f0f0', padding: '0.125rem 0.25rem' }}>NS=&quot;{contextNamespaceId}&quot;</code>.
+              </p>
+            )}
+          </div>
         )}
         {!loading && !error && filteredCategories.length > 0 && (
           <div>

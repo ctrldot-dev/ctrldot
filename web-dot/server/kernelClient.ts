@@ -4,11 +4,13 @@ type KernelFetchOptions = {
   method?: string;
   query?: Record<string, string | number | undefined>;
   body?: unknown;
+  /** When true, do not inject default namespace_id (e.g. for /v1/namespaces) */
+  skipNamespaceInject?: boolean;
 };
 
 /**
  * Minimal server-side client for the Kernel HTTP API.
- * Always injects namespace_id for demo endpoints that support it.
+ * Injects namespace_id for endpoints that support it unless skipNamespaceInject or query already has namespace_id.
  */
 export async function kernelFetchJson<T>(path: string, opts: KernelFetchOptions = {}): Promise<T> {
   const url = new URL(`${config.kernelUrl}${path}`);
@@ -21,8 +23,8 @@ export async function kernelFetchJson<T>(path: string, opts: KernelFetchOptions 
     }
   }
 
-  // inject namespace unless caller already provided it
-  if (!url.searchParams.has('namespace_id')) {
+  // inject namespace unless caller already provided it or asked to skip
+  if (!opts.skipNamespaceInject && !url.searchParams.has('namespace_id')) {
     url.searchParams.set('namespace_id', config.namespace);
   }
 
