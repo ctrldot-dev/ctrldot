@@ -76,7 +76,6 @@ Signed artefact per run (or per DENY/STOP when auto-bundles are enabled). Each b
 | [docs/AGENT_EXPERIENCE.md](docs/AGENT_EXPERIENCE.md) | Capabilities, recommendations, panic, resolution, bundles |
 | [docs/CONFIG.md](docs/CONFIG.md) | Configuration reference |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Deploy ctrldot.dev, DNS, GitHub Pages |
 
 ## Licence
 
