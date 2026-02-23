@@ -24,7 +24,8 @@ vendor/
 # Go workspace file
 go.work
 
-# IDE
+# IDE / editor
+.cursor/
 .idea/
 .vscode/
 *.swp
