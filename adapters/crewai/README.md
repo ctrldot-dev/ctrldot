@@ -1,0 +1,86 @@
+# Ctrl Dot CrewAI Adapter
+
+Python adapter for guarding CrewAI LLM calls and tool execution via Ctrl Dot.
+
+## Installation
+
+```bash
+cd adapters/crewai
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e .
+pip install crewai  # Optional: for running examples
+```
+
+## Quick Start
+
+```python
+from ctrldot_crewai import CtrlDotClient, CtrlDotLLM, CtrlDotToolWrapper
+from crewai import Agent, Task, Crew
+
+# Initialize client
+client = CtrlDotClient()
+
+# Register agent
+client.register_agent("my-agent", "My CrewAI Agent")
+
+# Wrap your LLM
+from crewai import LLM
+provider_llm = LLM(model="claude-opus-4.6")
+guarded_llm = CtrlDotLLM(
+    model="claude-opus-4.6",
+    provider_llm=provider_llm,
+    ctrldot_client=client,
+    agent_id="my-agent",
+    session_id="session-123"
+)
+
+# Wrap your tools
+from crewai.tools import BaseTool
+my_tool = SomeTool()
+guarded_tool = CtrlDotToolWrapper(
+    inner=my_tool,
+    ctrldot_client=client,
+    agent_id="my-agent",
+    session_id="session-123"
+)
+
+# Use in CrewAI
+agent = Agent(
+    role="Assistant",
+    llm=guarded_llm,
+    tools=[guarded_tool]
+)
+```
+
+## Environment Variables
+
+- `CTRLDOT_URL` - Ctrl Dot daemon URL (default: `http://127.0.0.1:7777`)
+- `CTRLDOT_AGENT_ID` - Default agent ID (default: `crewai-agent`)
+- `CTRLDOT_AGENT_NAME` - Default agent name (default: `CrewAI Agent`)
+- `CTRLDOT_SESSION_ID` - Session ID (default: random UUID per run)
+- `CTRLDOT_AUTH_TOKEN` - Optional bearer token
+
+## Features
+
+- **LLM Guarding**: All LLM calls are proposed to Ctrl Dot before execution
+- **Tool Guarding**: All tool executions are guarded
+- **Throttle Handling**: Automatically reduces max_tokens/temperature on THROTTLE
+- **Error Handling**: Clear exceptions on DENY/STOP decisions
+
+## Example
+
+See `examples/crew_minimal.py` for a complete working example.
+
+## Testing
+
+```bash
+pytest tests/
+```
+
+## Decision Handling
+
+- **ALLOW**: Proceeds normally
+- **WARN**: Logs warning, proceeds
+- **THROTTLE**: Reduces max_tokens/temperature, proceeds
+- **DENY/STOP**: Raises `CtrlDotDeniedError`

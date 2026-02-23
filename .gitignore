@@ -1,5 +1,8 @@
 # Binaries
 kernel
+bin/
+ctrldot
+ctrldotd
 *.exe
 *.exe~
 *.dll
@@ -28,9 +31,21 @@ go.work
 *.swo
 *~
 
-# Environment
+# Environment and secrets
 .env
-.env.local
+.env.*
+*.pem
+*.key
+**/keys/
+**/.ctrldot/
+**/bundles/
+ctrldot.sqlite
+.venv/
+venv/
+
+# Adapter build artifacts
+adapters/openclaw/plugin/node_modules/
+adapters/openclaw/plugin/dist/
 
 # Database
 *.db

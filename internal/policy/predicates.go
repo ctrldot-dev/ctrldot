@@ -128,6 +128,12 @@ func (p *PredicateEvaluator) evaluateRoleEdgeAllowed(ctx context.Context, args m
 		return false, fmt.Errorf("failed to get child roles: %w", err)
 	}
 
+	// If either node has no roles at this asofSeq (e.g. roles applied in a previous plan not yet visible), allow.
+	// This lets seed flows that apply nodes, then roles, then links in separate plans succeed.
+	if len(parentRolesList) == 0 || len(childRolesList) == 0 {
+		return true, nil
+	}
+
 	// Check if parent has an allowed role
 	parentHasAllowedRole := false
 	for _, allowedRole := range parentRoles {

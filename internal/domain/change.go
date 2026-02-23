@@ -10,6 +10,7 @@ type Change struct {
 
 // Change kinds (atomic operations)
 const (
+	// Kernel domain changes
 	ChangeCreateNode          = "CreateNode"
 	ChangeCreateLink          = "CreateLink"
 	ChangeCreateMaterial      = "CreateMaterial"
@@ -18,6 +19,15 @@ const (
 	ChangeRetireLink          = "RetireLink"
 	ChangeRetireMaterial      = "RetireMaterial"
 	ChangeRetireRoleAssignment = "RetireRoleAssignment"
+	
+	// Ctrl Dot domain changes
+	ChangeCreateAgent         = "CreateAgent"
+	ChangeCreateSession       = "CreateSession"
+	ChangeEndSession          = "EndSession"
+	ChangeAppendEvent         = "AppendEvent"
+	ChangeUpdateLimitsState   = "UpdateLimitsState"
+	ChangeHaltAgent           = "HaltAgent"
+	ChangeResumeAgent         = "ResumeAgent"
 )
 
 // Validate checks if the change is valid
@@ -26,6 +36,7 @@ func (c Change) Validate() error {
 		return ErrInvalidChangeKind
 	}
 	validKinds := map[string]bool{
+		// Kernel domain
 		ChangeCreateNode:           true,
 		ChangeCreateLink:           true,
 		ChangeCreateMaterial:       true,
@@ -34,6 +45,14 @@ func (c Change) Validate() error {
 		ChangeRetireLink:           true,
 		ChangeRetireMaterial:       true,
 		ChangeRetireRoleAssignment: true,
+		// Ctrl Dot domain
+		ChangeCreateAgent:       true,
+		ChangeCreateSession:     true,
+		ChangeEndSession:        true,
+		ChangeAppendEvent:       true,
+		ChangeUpdateLimitsState: true,
+		ChangeHaltAgent:         true,
+		ChangeResumeAgent:       true,
 	}
 	if !validKinds[c.Kind] {
 		return ErrInvalidChangeKind

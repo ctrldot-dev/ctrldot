@@ -1,0 +1,39 @@
+{
+  "name": "OpenClaw with Ctrl Dot",
+  "version": "0.1.0",
+  "description": "OpenClaw configuration with Ctrl Dot guards enabled",
+  
+  "plugins": [
+    {
+      "id": "ctrldot",
+      "path": "./adapters/openclaw/plugin",
+      "config": {
+        "ctrldotUrl": "http://127.0.0.1:7777",
+        "agentId": "openclaw-agent",
+        "agentName": "OpenClaw Agent"
+      }
+    }
+  ],
+  
+  "toolGroups": {
+    "runtime": {
+      "enabled": false,
+      "deny": ["exec"]
+    },
+    "web": {
+      "enabled": false,
+      "deny": ["web_fetch"]
+    },
+    "ctrldot": {
+      "enabled": true,
+      "allow": ["ctrldot_exec", "ctrldot_web_fetch", "ctrldot_propose"]
+    }
+  },
+  
+  "skills": [
+    {
+      "id": "ctrldot-guard",
+      "path": "./adapters/openclaw/skills/ctrldot-guard"
+    }
+  ]
+}

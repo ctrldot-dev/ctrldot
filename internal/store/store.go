@@ -24,6 +24,40 @@ type Store interface {
 
 	// Namespaces
 	CreateNamespace(ctx context.Context, namespace domain.Namespace) error
+
+	// Proposal sets and resolutions (Decision Ledger)
+	GetProposalSet(ctx context.Context, proposalSetID string) (*domain.ProposalSet, error)
+	GetResolution(ctx context.Context, resolutionID string) (*domain.Resolution, error)
+	ListProposalSetsForNode(ctx context.Context, nodeID, namespaceID string, limit int) ([]domain.ProposalSet, error)
+	GetResolutionForProposalSet(ctx context.Context, proposalSetID string) (*domain.Resolution, error)
+
+	// Ctrl Dot: Agents
+	CreateAgent(ctx context.Context, agent domain.Agent) error
+	GetAgent(ctx context.Context, agentID string) (*domain.Agent, error)
+	ListAgents(ctx context.Context) ([]domain.Agent, error)
+	IsAgentHalted(ctx context.Context, agentID string) (bool, error)
+
+	// Ctrl Dot: Sessions
+	CreateSession(ctx context.Context, session domain.Session) error
+	GetSession(ctx context.Context, sessionID string) (*domain.Session, error)
+	EndSession(ctx context.Context, sessionID string) error
+
+	// Ctrl Dot: Events
+	AppendEvent(ctx context.Context, event domain.Event) error
+	GetEvents(ctx context.Context, agentID *string, sinceTS *int64, limit int) ([]domain.Event, error)
+	GetEvent(ctx context.Context, eventID string) (*domain.Event, error)
+
+	// Ctrl Dot: Limits State
+	GetLimitsState(ctx context.Context, agentID string, windowStart int64, windowType string) (*domain.LimitsState, error)
+	UpdateLimitsState(ctx context.Context, state domain.LimitsState) error
+
+	// Ctrl Dot: Agent Control
+	HaltAgent(ctx context.Context, agentID string, reason string) error
+	ResumeAgent(ctx context.Context, agentID string) error
+
+	// Ctrl Dot: Panic mode (single-row state)
+	GetPanicState(ctx context.Context) (*domain.PanicState, error)
+	SetPanicState(ctx context.Context, state domain.PanicState) error
 }
 
 // Tx represents a database transaction
@@ -75,4 +109,17 @@ type Tx interface {
 	// Namespace listing (for UI)
 	ListNamespaceIDsWithNodes(ctx context.Context, asofSeq int64) ([]string, error)
 	GetNamespaceRoot(ctx context.Context, namespaceID string, asofSeq int64) (nodeID, title, role string, err error)
+
+	// Proposal sets and resolutions
+	StoreProposalSet(ctx context.Context, ps *domain.ProposalSet) error
+	StoreResolution(ctx context.Context, r *domain.Resolution) error
+
+	// Ctrl Dot: Agents (transactional)
+	CreateAgentTx(ctx context.Context, agent domain.Agent) error
+	CreateSessionTx(ctx context.Context, session domain.Session) error
+	EndSessionTx(ctx context.Context, sessionID string) error
+	AppendEventTx(ctx context.Context, event domain.Event, opSeq int64) error
+	UpdateLimitsStateTx(ctx context.Context, state domain.LimitsState) error
+	HaltAgentTx(ctx context.Context, agentID string, reason string) error
+	ResumeAgentTx(ctx context.Context, agentID string) error
 }

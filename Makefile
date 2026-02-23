@@ -81,3 +81,41 @@ install-dot: build-dot
 	@chmod +x ~/bin/dot
 	@echo "Installed to ~/bin/dot"
 	@echo "Make sure ~/bin is in your PATH: export PATH=\$$PATH:\$$HOME/bin"
+
+# ---------------------------------------------------------------------------
+# Ctrl Dot
+# ---------------------------------------------------------------------------
+CTRLDOT_PORT ?= 7777
+
+# Run Ctrl Dot migrations (requires Postgres; use docker exec if needed)
+ctrldot-migrate:
+	@echo "Running Ctrl Dot migrations..."
+	@docker exec -i futurematic-kernel-postgres psql -U kernel -d kernel < migrations/0007_ctrldot_tables.sql 2>/dev/null || \
+		echo "Tip: start Postgres with docker-compose up -d, then run: docker exec -i futurematic-kernel-postgres psql -U kernel -d kernel < migrations/0007_ctrldot_tables.sql"
+
+# Build Ctrl Dot daemon and CLI
+build-ctrldot:
+	@mkdir -p bin
+	@go build -o bin/ctrldotd ./cmd/ctrldotd
+	@go build -o bin/ctrldot ./cmd/ctrldot
+	@go build -o bin/ctrldot-mcp ./cmd/ctrldot-mcp
+	@echo "Built: bin/ctrldotd, bin/ctrldot, bin/ctrldot-mcp"
+
+# Start Ctrl Dot daemon (requires Postgres and migrations)
+ctrldot-up: docker-up build-ctrldot
+	@echo "Starting Ctrl Dot on port $(CTRLDOT_PORT)..."
+	@DB_URL=$(DB_URL) PORT=$(CTRLDOT_PORT) ./bin/ctrldotd
+
+# Build OpenClaw plugin
+setup-openclaw-plugin:
+	@echo "Building Ctrl Dot OpenClaw plugin..."
+	@cd adapters/openclaw/plugin && npm install && npm run build
+	@echo "Plugin built: adapters/openclaw/plugin/dist/"
+
+# CrewAI setup (creates venv and installs; run from repo root, then activate .venv and run example)
+setup-crewai:
+	@echo "Setting up CrewAI adapter..."
+	@python3 -m venv .venv
+	@echo "Run: source .venv/bin/activate"
+	@echo "Then: pip install --upgrade pip && pip install crewai && pip install -e adapters/crewai"
+	@echo "Then: python adapters/crewai/examples/crew_minimal.py"

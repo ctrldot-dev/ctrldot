@@ -1,0 +1,21 @@
+{
+  "name": "ctrldot-openclaw-plugin",
+  "version": "0.1.0",
+  "description": "Ctrl Dot plugin for OpenClaw - Guard tool execution",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": ["openclaw", "ctrldot", "guard"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "optionalDependencies": {
+    "@openclaw/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a bug or unexpected behaviour
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please fill in as much as you can.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Ctrl Dot version (e.g. from VERSION file, or binary/build)
+      placeholder: "0.10.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: Operating system and version
+      placeholder: "macOS 14, Ubuntu 22.04"
+    validations:
+      required: true
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: Adapter / client
+      description: How are you using Ctrl Dot?
+      options:
+        - CLI only
+        - OpenClaw
+        - CrewAI
+        - Go SDK / other
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect?
+      placeholder: Describe the bug and steps to reproduce.
+    validations:
+      required: true
+  - type: textarea
+    id: bundle
+    attributes:
+      label: Bundle (if applicable)
+      description: If the issue is about a DENY/STOP or run artefact, attach a bundle directory (zip it) or paste the relevant part of a bundle README/manifest. Do not paste secrets.
+      placeholder: "Optional: attach zip or paste path / summary"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Relevant daemon or client output (redact secrets).
+      render: shell
+    validations:
+      required: false

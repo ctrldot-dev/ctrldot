@@ -1,0 +1,60 @@
+# Goreleaser config for Ctrl Dot — produces binaries for GitHub Release on tags v*
+version: 2
+project_name: ctrldot
+
+builds:
+  - id: ctrldotd
+    main: ./cmd/ctrldotd
+    binary: ctrldotd
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: ctrldot
+    main: ./cmd/ctrldot
+    binary: ctrldot
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: ctrldot-mcp
+    main: ./cmd/ctrldot-mcp
+    binary: ctrldot-mcp
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds:
+      - ctrldotd
+      - ctrldot
+      - ctrldot-mcp
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: ctrldot-dev
+    name: ctrldot
+  draft: false

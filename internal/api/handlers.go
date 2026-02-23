@@ -8,6 +8,7 @@ import (
 
 	"github.com/futurematic/kernel/internal/domain"
 	"github.com/futurematic/kernel/internal/kernel"
+	"github.com/futurematic/kernel/internal/ledger/sink"
 	"github.com/futurematic/kernel/internal/query"
 )
 
@@ -70,10 +71,11 @@ func (h *Handlers) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ActorID     string   `json:"actor_id"`
+		ActorID      string   `json:"actor_id"`
 		Capabilities []string `json:"capabilities"`
-		PlanID      string   `json:"plan_id"`
-		PlanHash    string   `json:"plan_hash"`
+		PlanID       string   `json:"plan_id"`
+		PlanHash     string   `json:"plan_hash"`
+		ResolutionID string   `json:"resolution_id,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,10 +84,11 @@ func (h *Handlers) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kernelReq := kernel.ApplyRequest{
-		ActorID:     req.ActorID,
+		ActorID:      req.ActorID,
 		Capabilities: req.Capabilities,
 		PlanID:      req.PlanID,
 		PlanHash:    req.PlanHash,
+		ResolutionID: req.ResolutionID,
 	}
 
 	operation, err := h.kernelService.Apply(r.Context(), kernelReq)
@@ -298,6 +301,145 @@ func (h *Handlers) NamespaceRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]string{"node_id": nodeID, "title": title, "role": role}, http.StatusOK)
+}
+
+// Resolve handles POST /v1/resolve
+func (h *Handlers) Resolve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ProposalSetID  string `json:"proposal_set_id"`
+		OptionID       string `json:"option_id"`
+		Resolver       string `json:"resolver"`
+		Rationale      string `json:"rationale,omitempty"`
+		Constraints    string `json:"constraints,omitempty"`
+		AssumptionsSnap string `json:"assumptions_snap,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, NewError(ErrorCodeValidation, "Invalid request body", nil), http.StatusBadRequest)
+		return
+	}
+	resolution, err := h.kernelService.Resolve(r.Context(), kernel.ResolveRequest{
+		ProposalSetID:  req.ProposalSetID,
+		OptionID:       req.OptionID,
+		Resolver:       req.Resolver,
+		Rationale:      req.Rationale,
+		Constraints:    req.Constraints,
+		AssumptionsSnap: req.AssumptionsSnap,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "option_id") {
+			respondError(w, NewError(ErrorCodeValidation, err.Error(), nil), http.StatusBadRequest)
+			return
+		}
+		respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, resolution, http.StatusOK)
+}
+
+// ProposalSetsRoot handles POST /v1/proposal_sets and GET /v1/proposal_sets?focused_node_id=&namespace_id=
+func (h *Handlers) ProposalSetsRoot(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var ps domain.ProposalSet
+		if err := json.NewDecoder(r.Body).Decode(&ps); err != nil {
+			respondError(w, NewError(ErrorCodeValidation, "Invalid request body", nil), http.StatusBadRequest)
+			return
+		}
+		if err := h.kernelService.StoreProposalSet(r.Context(), &ps); err != nil {
+			if err == domain.ErrProposalSetTooFewOptions || err == domain.ErrProposalSetInvalid {
+				respondError(w, NewError(ErrorCodeValidation, err.Error(), nil), http.StatusBadRequest)
+				return
+			}
+			respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+			return
+		}
+		respondJSON(w, map[string]string{"proposal_set_id": ps.ProposalSetID}, http.StatusOK)
+		return
+	}
+	if r.Method == http.MethodGet {
+		nodeID := r.URL.Query().Get("focused_node_id")
+		namespaceID := r.URL.Query().Get("namespace_id")
+		if nodeID == "" || namespaceID == "" {
+			respondError(w, NewError(ErrorCodeValidation, "focused_node_id and namespace_id are required", nil), http.StatusBadRequest)
+			return
+		}
+		limit := 50
+		if l := r.URL.Query().Get("limit"); l != "" {
+			if n, err := strconv.Atoi(l); err == nil && n > 0 {
+				limit = n
+			}
+		}
+		list, err := h.queryEngine.ListProposalSetsForNode(r.Context(), nodeID, namespaceID, limit)
+		if err != nil {
+			respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+			return
+		}
+		if list == nil {
+			list = []domain.ProposalSet{}
+		}
+		respondJSON(w, map[string]interface{}{"proposal_sets": list}, http.StatusOK)
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// ProposalSetsByID handles GET /v1/proposal_sets/:id and GET /v1/proposal_sets/:id/resolution
+func (h *Handlers) ProposalSetsByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	suffix := strings.TrimPrefix(r.URL.Path, "/v1/proposal_sets/")
+	if suffix == "" {
+		respondError(w, NewError(ErrorCodeValidation, "proposal_set_id is required", nil), http.StatusBadRequest)
+		return
+	}
+	if strings.HasSuffix(suffix, "/resolution") {
+		id := strings.TrimSuffix(suffix, "/resolution")
+		id = strings.TrimSuffix(id, "/")
+		if id == "" {
+			respondError(w, NewError(ErrorCodeValidation, "proposal_set_id is required", nil), http.StatusBadRequest)
+			return
+		}
+		resolution, err := h.queryEngine.GetResolutionForProposalSet(r.Context(), id)
+		if err != nil {
+			respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+			return
+		}
+		if resolution == nil {
+			respondJSON(w, map[string]interface{}{"resolution": nil}, http.StatusOK)
+			return
+		}
+		respondJSON(w, map[string]interface{}{"resolution": resolution}, http.StatusOK)
+		return
+	}
+	ps, err := h.queryEngine.GetProposalSet(r.Context(), suffix)
+	if err != nil {
+		if err == domain.ErrProposalSetNotFound {
+			respondError(w, NewError(ErrorCodeNotFound, err.Error(), nil), http.StatusNotFound)
+			return
+		}
+		respondError(w, NewError(ErrorCodeInternal, err.Error(), nil), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, ps, http.StatusOK)
+}
+
+// CtRLDotDecisions handles POST /v1/ctrldot/decisions (Kernel HTTP sink: append decision record).
+func (h *Handlers) CtRLDotDecisions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var d sink.DecisionRecord
+	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Helper functions

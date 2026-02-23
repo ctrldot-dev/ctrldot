@@ -1,0 +1,39 @@
+{
+  "id": "ctrldot",
+  "name": "Ctrl Dot Guard",
+  "version": "0.1.0",
+  "description": "Guard tool execution via Ctrl Dot - replaces exec and web_fetch with guarded versions",
+  "entry": "./dist/index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "ctrldotUrl": { "type": "string" },
+      "agentId": { "type": "string" },
+      "agentName": { "type": "string" },
+      "authToken": { "type": "string" }
+    }
+  },
+  "config": {
+    "ctrldotUrl": {
+      "type": "string",
+      "default": "http://127.0.0.1:7777",
+      "description": "Ctrl Dot daemon URL"
+    },
+    "agentId": {
+      "type": "string",
+      "default": "openclaw-agent",
+      "description": "Agent identifier"
+    },
+    "agentName": {
+      "type": "string",
+      "default": "OpenClaw Agent",
+      "description": "Agent display name"
+    },
+    "authToken": {
+      "type": "string",
+      "optional": true,
+      "description": "Optional bearer token"
+    }
+  }
+}

@@ -23,6 +23,12 @@ type Engine interface {
 
 	// GetNamespaceRoot returns the root node for a namespace (no incoming CONTAINS), preferring role *.Domain
 	GetNamespaceRoot(ctx context.Context, namespaceID string) (nodeID, title, role string, err error)
+
+	// Decision Ledger: proposal sets and resolutions
+	GetProposalSet(ctx context.Context, proposalSetID string) (*domain.ProposalSet, error)
+	GetResolution(ctx context.Context, resolutionID string) (*domain.Resolution, error)
+	ListProposalSetsForNode(ctx context.Context, nodeID, namespaceID string, limit int) ([]domain.ProposalSet, error)
+	GetResolutionForProposalSet(ctx context.Context, proposalSetID string) (*domain.Resolution, error)
 }
 
 // ExpandRequest contains parameters for expand
@@ -96,4 +102,24 @@ func (e *engine) GetNamespaceRoot(ctx context.Context, namespaceID string) (node
 		return "", "", "", err
 	}
 	return tx.GetNamespaceRoot(ctx, namespaceID, asofSeq)
+}
+
+// GetProposalSet implements Engine
+func (e *engine) GetProposalSet(ctx context.Context, proposalSetID string) (*domain.ProposalSet, error) {
+	return e.store.GetProposalSet(ctx, proposalSetID)
+}
+
+// GetResolution implements Engine
+func (e *engine) GetResolution(ctx context.Context, resolutionID string) (*domain.Resolution, error) {
+	return e.store.GetResolution(ctx, resolutionID)
+}
+
+// ListProposalSetsForNode implements Engine
+func (e *engine) ListProposalSetsForNode(ctx context.Context, nodeID, namespaceID string, limit int) ([]domain.ProposalSet, error) {
+	return e.store.ListProposalSetsForNode(ctx, nodeID, namespaceID, limit)
+}
+
+// GetResolutionForProposalSet implements Engine
+func (e *engine) GetResolutionForProposalSet(ctx context.Context, proposalSetID string) (*domain.Resolution, error) {
+	return e.store.GetResolutionForProposalSet(ctx, proposalSetID)
 }

@@ -51,6 +51,21 @@ func (e *Expander) expandIntent(ctx context.Context, intent domain.Intent, names
 		return e.expandRetireMaterial(intent)
 	case domain.IntentMove:
 		return e.expandMove(intent, namespaceID, asofSeq, store)
+	// Ctrl Dot domain intents
+	case domain.IntentAppendEvent:
+		return e.expandAppendEvent(intent)
+	case domain.IntentRegisterAgent:
+		return e.expandRegisterAgent(intent)
+	case domain.IntentCreateSession:
+		return e.expandCreateSession(intent)
+	case domain.IntentEndSession:
+		return e.expandEndSession(intent)
+	case domain.IntentUpdateLimitsState:
+		return e.expandUpdateLimitsState(intent)
+	case domain.IntentHaltAgent:
+		return e.expandHaltAgent(intent)
+	case domain.IntentResumeAgent:
+		return e.expandResumeAgent(intent)
 	default:
 		return nil, fmt.Errorf("unknown intent kind: %s", intent.Kind)
 	}
@@ -333,4 +348,63 @@ func (e *Expander) expandMove(intent domain.Intent, namespaceID *string, asofSeq
 	}
 
 	return []domain.Change{retireChange, createChange}, nil
+}
+
+// Ctrl Dot intent expansions
+
+func (e *Expander) expandAppendEvent(intent domain.Intent) ([]domain.Change, error) {
+	// AppendEvent intent directly maps to ChangeAppendEvent
+	change := domain.Change{
+		Kind:    domain.ChangeAppendEvent,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandRegisterAgent(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeCreateAgent,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandCreateSession(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeCreateSession,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandEndSession(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeEndSession,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandUpdateLimitsState(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeUpdateLimitsState,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandHaltAgent(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeHaltAgent,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
+}
+
+func (e *Expander) expandResumeAgent(intent domain.Intent) ([]domain.Change, error) {
+	change := domain.Change{
+		Kind:    domain.ChangeResumeAgent,
+		Payload: intent.Payload,
+	}
+	return []domain.Change{change}, nil
 }

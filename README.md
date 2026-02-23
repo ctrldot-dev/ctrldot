@@ -1,409 +1,130 @@
-# Futurematic Kernel v0.1
+# Ctrl Dot
 
-An append-only fact engine for Nodes/Links/Materials with deterministic planning, policy enforcement, and addressable history.
+**Runtime execution boundary for AI agents.**
 
-**Includes:** Kernel API, Dot CLI, and Web Dot UI (v0.2)
+Ctrl Dot is a local daemon that sits between agents and their actions. It enforces budget ceilings, loop detection, resolution gating, filesystem/network scope, and deterministic STOP conditions at runtime.
 
-## Overview
+*Autonomy without boundaries is fragility.*
 
-The Futurematic Kernel is a Go service that serves as the system of record for a graph-based data model. It enforces strict invariants:
-
-- **Append-only operations**: All changes are immutable audit records
-- **Plan → Apply workflow**: All mutations must be planned before applying
-- **Deterministic hashing**: Same inputs always produce the same plan hash
-- **Policy enforcement**: YAML-based policies evaluated at plan and apply time
-- **Addressable history**: Query any point in time using `asof_seq` or `asof_time`
-
-## Architecture
-
-The kernel is organized into clean layers:
-
-- **`internal/domain`**: Core domain types (Node, Link, Material, Operation, Plan, etc.)
-- **`internal/store`**: Database persistence layer with transaction support
-- **`internal/planner`**: Intent expansion and deterministic hashing
-- **`internal/policy`**: YAML policy parsing and evaluation with predicates
-- **`internal/query`**: Read operations (expand, history, diff)
-- **`internal/kernel`**: Plan/Apply orchestration
-- **`internal/api`**: HTTP REST API handlers
-- **`cmd/kernel`**: Main application entry point
-
-## Setup
-
-### Prerequisites
-
-- Go 1.21+
-- PostgreSQL 14+
-- Docker and Docker Compose (for local development)
-- Node.js 18+ and npm (for Web Dot UI)
-
-### Database Setup
-
-1. Start PostgreSQL:
-```bash
-docker-compose up -d
-```
-
-2. Run migrations:
-```bash
-make migrate
-```
-
-### Running the Kernel
+## Quickstart (SQLite, no Postgres)
 
 ```bash
-make dev
+git clone https://github.com/ctrldot-dev/ctrldot.git
+cd ctrldot
+make build-ctrldot
+./bin/ctrldot daemon start
 ```
 
-Or manually:
-```bash
-go run cmd/kernel/main.go
-```
-
-The server will start on port 8080 (configurable via `PORT` environment variable).
-
-### Install the CLI
-
-The `dot` CLI provides a git-like interface for interacting with the kernel:
+In another terminal:
 
 ```bash
-# Build the CLI
-make build-dot
-
-# Install to ~/bin (adds to PATH)
-make install-dot
+./bin/ctrldot panic on
 ```
 
-See [cmd/dot/README.md](cmd/dot/README.md) for complete CLI documentation.
+## Integrations
 
-## Web Dot UI
+- **OpenClaw:** [adapters/openclaw/GETTING_STARTED.md](adapters/openclaw/GETTING_STARTED.md)
+- **CrewAI:** [adapters/crewai/README.md](adapters/crewai/README.md)
 
-The **Web Dot UI** provides a modern web-based interface for browsing Product Ledger namespaces. It runs as a Node.js/TypeScript Express server that serves the UI and provides GUI-friendly API endpoints.
+## Agent Experience
 
-### Quick Start
+- **Capabilities:** `GET /v1/capabilities`
+- **MCP tool:** `ctrldot-mcp capabilities` (or `ctrldot_capabilities`)
+- **Recommendations:** machine-readable `recommendation` object on DENY/STOP (next_steps, docs_hint)
+- **Bundles:** signed run artefacts with `README.md` inside each bundle
+
+See [docs/AGENT_EXPERIENCE.md](docs/AGENT_EXPERIENCE.md) for agents.
+
+---
+
+## Why boundaries
+
+Agents that can execute arbitrary actions need a single place to enforce limits and policy. Ctrl Dot gives you:
+
+- **Budget enforcement** — daily spend caps and warn/throttle/stop thresholds per agent
+- **Loop detection** — repeated identical actions trigger STOP
+- **Resolution gating** — high-risk actions (e.g. `git.push`, `filesystem.delete`) require a short-lived resolution token
+- **Deterministic STOP** — DENY/STOP with stable reason codes and a recommendation object so agents (or operators) know what to do next
+- **Signed run artefacts** — bundles (and auto-bundles on DENY/STOP) for audit and debugging
+
+## Panic Mode
+
+One switch to tighten behaviour without editing config:
 
 ```bash
-cd web-dot
-npm install
-npm run dev
+./bin/ctrldot panic on --ttl 30m --reason "testing new tool"
+./bin/ctrldot panic status
+./bin/ctrldot panic off
 ```
 
-Then open `http://localhost:3000` in your browser.
+When panic is on: budget is clamped, thresholds tightened, resolution forced for more actions, filesystem/network and loop rules use stricter overlays. State persists across daemon restarts. See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md#panic-mode-strict-behaviour).
 
-### Features
+## Bundles
 
-- **Products Tab**: Browse product trees with expand/collapse, node signals, and details drawer
-- **Intent Tab**: View Strategic Objectives, Assurance Obligations, and Transformation Themes with connections
-- **Ledger Tab**: Inspect operation history with entry details and affected node navigation
-- **Materials Tab**: Browse materials by category with search/filter, open in Markdown viewer
-- **Details Drawer**: View node relationships (Children, Alignment, Coherence, Decisions & Evidence, Materials)
-- **Cross-tab Navigation**: Deep-link nodes between tabs
-- **Material Context Panel**: View linked nodes and other materials in Markdown viewer
-
-### Configuration
-
-The Web Dot server is configured via `web-dot/server/config.ts`:
-- Kernel URL (default: `http://localhost:8080`)
-- Namespace (default: `ProductLedger:/Kesteron`)
-- Pinned roots (FieldServe, AssetLink, SO-1, AO-1, TT-1)
-- Server port (default: `3000`)
-- **NAMESPACE** env: set to `FinLedger:/Kesteron/Treasury` or `FinLedger:/Kesteron/StablecoinReserves` to browse FinLedger (use `?root=<node_id>` for products tree; root IDs are printed when running `make seed-finledger`)
-
-### Second domain: Financial Ledger (FinLedger:*)
-
-The kernel supports a second domain overlay using the same Node / RoleAssignment / Link abstractions. FinLedger namespaces use a separate policy set (`financialledger-policyset.yaml`) and are validated only against it.
-
-1. **Migrations** (run with `make migrate`): `0002_finledger_namespaces.sql` creates namespaces `FinLedger`, `FinLedger:/Kesteron/Treasury`, `FinLedger:/Kesteron/StablecoinReserves`.
-2. **Register policy set** (after migrate, kernel need not be running): `make bootstrap-finledger` loads `financialledger-policyset.yaml` for `FinLedger:*`.
-3. **Ingest seed graphs** (kernel must be running): `make seed-finledger` ingests `kesteron-treasury-finledger-seed.yaml` and `kesteron-stablecoinreserves-finledger-seed.yaml` into the same kernel instance. Root node IDs for the UI are printed.
-4. **Browse in UI**: set `NAMESPACE=FinLedger:/Kesteron/Treasury` (or StablecoinReserves), then open products tree with `?root=<root_node_id>`.
-5. **CLI**: `dot use FinLedger:/Kesteron/Treasury` then `dot ls`, `dot show <node_id>`, etc.
-
-### Development
+Signed artefact per run (or per DENY/STOP when auto-bundles are enabled). Each bundle includes events, decisions, config snapshot, and a `README.md` with suggested next steps.
 
 ```bash
-# Development mode (watch mode for server and client)
-npm run dev
-
-# Build TypeScript
-npm run build
-
-# Production mode
-npm start
+./bin/ctrldot bundle ls
+./bin/ctrldot bundle verify /path/to/bundle
 ```
 
-The UI uses React 18 with TypeScript and ES modules, served directly without a build tool for simplicity.
+## Docs
 
-## Command Line Interface (CLI)
+| Doc | Description |
+|-----|-------------|
+| [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Install, run daemon, CrewAI/OpenClaw, smoke tests |
+| [docs/AGENT_EXPERIENCE.md](docs/AGENT_EXPERIENCE.md) | Capabilities, recommendations, panic, resolution, bundles |
+| [docs/CONFIG.md](docs/CONFIG.md) | Configuration reference |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Deploy ctrldot.dev, DNS, GitHub Pages |
 
-The `dot` CLI provides a git-like interface for interacting with the kernel.
+## Licence
 
-### Quick Examples
+Apache-2.0. See [LICENSE](LICENSE).
+
+---
+
+## Prerequisites
+
+- **Go 1.21+** (and `make` for `make build-ctrldot`)
+- **Optional:** PostgreSQL + Docker for Kernel HTTP sink and legacy runtime store; otherwise SQLite is used by default.
+
+## Build
 
 ```bash
-# Check status
-dot status
-
-# Set namespace
-dot use ProductTree:/TestProduct
-
-# Create a node
-dot new node "My Goal" --yes
-
-# View a node
-dot show node:123
-
-# View history
-dot history ProductTree:/TestProduct
-
-# Create a link
-dot link node:123 node:456 --type RELATED_TO --yes
-
-# Assign a role
-dot role assign node:123 --role Goal --yes
+make build-ctrldot
+# Or:
+go build -o bin/ctrldotd ./cmd/ctrldotd
+go build -o bin/ctrldot ./cmd/ctrldot
+go build -o bin/ctrldot-mcp ./cmd/ctrldot-mcp
 ```
 
-### CLI Documentation
-
-- [CLI README](cmd/dot/README.md) - Complete CLI documentation
-- [CLI Quick Start](cmd/dot/QUICKSTART.md) - Quick start guide
-- [CLI Examples](cmd/dot/EXAMPLES.md) - Practical examples
-- [CLI Installation](cmd/dot/INSTALL.md) - Installation guide
-
-## API Endpoints
-
-### POST /v1/plan
-
-Creates a plan from intents.
-
-**Request:**
-```json
-{
-  "actor_id": "user:gareth",
-  "capabilities": ["read", "write:additive"],
-  "namespace_id": "ProductTree:/MachinePay",
-  "asof": { "seq": null, "time": null },
-  "intents": [
-    { "kind": "CreateNode", "namespace_id": "ProductTree:/MachinePay", "payload": { "title": "New Goal" } }
-  ]
-}
-```
-
-**Response:**
-```json
-{
-  "id": "plan:01J...",
-  "created_at": "2026-01-11T00:00:00Z",
-  "actor_id": "user:gareth",
-  "namespace_id": "ProductTree:/MachinePay",
-  "intents": [...],
-  "expanded": [...],
-  "class": 1,
-  "policy_report": { "denies": [], "warns": [], "infos": [] },
-  "hash": "sha256:..."
-}
-```
-
-### POST /v1/apply
-
-Applies a plan.
-
-**Request:**
-```json
-{
-  "actor_id": "user:gareth",
-  "capabilities": ["read", "write:additive"],
-  "plan_id": "plan:01J...",
-  "plan_hash": "sha256:..."
-}
-```
-
-**Response:**
-```json
-{
-  "id": "op:01J...",
-  "seq": 123,
-  "occurred_at": "2026-01-11T00:00:01Z",
-  "actor_id": "user:gareth",
-  "capabilities": ["read","write:additive"],
-  "plan_id": "plan:01J...",
-  "plan_hash": "sha256:...",
-  "class": 1,
-  "changes": [...]
-}
-```
-
-### GET /v1/expand
-
-Expands nodes with their roles, links, and materials.
-
-**Query Parameters:**
-- `ids` (required): Comma-separated node IDs
-- `namespace_id` (optional): Filter by namespace
-- `depth` (optional, default: 1): Expansion depth
-- `asof_seq` (optional): Query at specific sequence
-- `asof_time` (optional): Query at specific time (ISO 8601)
-
-**Response:**
-```json
-{
-  "nodes": [...],
-  "role_assignments": [...],
-  "links": [...],
-  "materials": [...]
-}
-```
-
-**CLI Usage:**
-```bash
-dot show node:123
-dot show node:123 --json
-```
-
-### GET /v1/history
-
-Retrieves operations for a target.
-
-**Query Parameters:**
-- `target` (required): Node ID or namespace ID
-- `limit` (optional, default: 100): Maximum number of operations
-
-**Response:**
-```json
-[
-  {
-    "id": "op:01J...",
-    "seq": 123,
-    "occurred_at": "2026-01-11T00:00:01Z",
-    ...
-  }
-]
-```
-
-### GET /v1/diff
-
-Computes the difference between two sequence numbers.
-
-**Query Parameters:**
-- `a_seq` (required): First sequence number
-- `b_seq` (required): Second sequence number
-- `target` (optional): Node ID or namespace ID to filter
-
-**Response:**
-```json
-{
-  "changes": [...]
-}
-```
-
-### GET /v1/healthz
-
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
-## Policy Language
-
-Policies are namespace-scoped YAML files that define rules for operations. See `context/08-default-policyset.yaml` for an example.
-
-### Predicates
-
-- `acyclic(link_type)`: Ensures no cycles in hierarchy
-- `role_edge_allowed(parent_role[], child_role[])`: Validates role transitions
-- `child_has_only_one_parent(child_role, link_type)`: Enforces single parent constraint
-- `has_capability(cap)`: Capability check (stub in v0.1)
-
-### Effects
-
-- `deny`: Blocks apply
-- `warn`: Logs warning but allows apply
-- `info`: Logs information
-
-## Development
-
-### Running Tests
+## CLI (summary)
 
 ```bash
-make test
+./bin/ctrldot status
+./bin/ctrldot doctor
+./bin/ctrldot agents
+./bin/ctrldot panic on | off | status
+./bin/ctrldot autobundle status | test
+./bin/ctrldot resolve allow-once --agent <id> --action <type> --ttl 10m
+./bin/ctrldot bundle ls
+./bin/ctrldot bundle verify <path>
 ```
 
-### Building
+## API (summary)
 
-```bash
-make build
-```
+- `GET /v1/health` — health check
+- `GET /v1/capabilities` — agent discovery (no secrets)
+- `POST /v1/agents/register` — register agent
+- `POST /v1/actions/propose` — propose action (returns ALLOW / WARN / THROTTLE / DENY / STOP)
+- `GET /v1/events` — event feed
+- `GET /v1/panic`, `POST /v1/panic/on`, `POST /v1/panic/off`
+- `GET /v1/autobundle`, `POST /v1/autobundle/test`
 
-### Project Structure
+Web UI: `http://127.0.0.1:7777/ui` (when daemon is running).
 
-```
-.
-├── cmd/
-│   ├── kernel/         # Main kernel application
-│   └── dot/             # Dot CLI application
-├── internal/
-│   ├── domain/         # Domain types
-│   ├── store/          # Database layer
-│   ├── planner/        # Intent expansion
-│   ├── policy/         # Policy engine
-│   ├── query/          # Query operations
-│   ├── kernel/         # Plan/Apply orchestration
-│   └── api/            # HTTP handlers
-├── web-dot/            # Web Dot UI (Node.js/TypeScript)
-│   ├── server/         # Express server with GUI API
-│   ├── src/            # React frontend
-│   └── public/        # Static assets
-├── migrations/         # Database migrations
-└── docker-compose.yml  # Local Postgres setup
-```
+## Security and contributing
 
-## Configuration
-
-Environment variables:
-
-- `DB_URL`: PostgreSQL connection string (default: `postgres://kernel:kernel@localhost:5432/kernel?sslmode=disable`)
-- `PORT`: HTTP server port (default: `8080`)
-
-## Status
-
-✅ **All Phases Complete**: Full implementation with integration tests
-
-- ✅ Phase 1: Foundation & Infrastructure
-- ✅ Phase 2: Store Layer
-- ✅ Phase 3: Planner Layer
-- ✅ Phase 4: Policy Engine
-- ✅ Phase 5: Query Engine
-- ✅ Phase 6: Kernel Service
-- ✅ Phase 7: API Layer
-- ✅ Phase 8: Main Application
-- ✅ Phase 9: Integration Tests (10/10 acceptance criteria covered)
-- ✅ Dot CLI: Fully implemented and tested
-- ✅ Web Dot UI v0.2: Complete web interface for Product Ledger namespaces
-
-## Testing
-
-Comprehensive integration tests are available covering all 10 acceptance criteria. See [TESTING.md](TESTING.md) for details.
-
-Run tests:
-```bash
-make test
-```
-
-## Next Steps
-
-1. ✅ Integration tests (Phase 9) - Complete
-2. ✅ Dot CLI - Complete
-3. ✅ Web Dot UI v0.2 - Complete
-4. Add policy set management endpoints
-5. Improve error handling and validation
-6. Add request logging middleware
-7. Performance optimization and indexing
-8. Add test isolation (separate DB per test)
-9. Web Dot UI enhancements (Markdown editor, write operations)
-
-## License
-
-[Your License Here]
+- **Vulnerabilities:** Report to **security@ctrldot.dev** (see [SECURITY.md](SECURITY.md)).
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) — tests, gofmt, backward compatibility, reason codes.

@@ -1,0 +1,23 @@
+{
+  "tools": {
+    "profile": "coding",
+    "deny": ["group:runtime", "group:web"]
+  },
+  "plugins": {
+    "enabled": true,
+    "allow": ["ctrldot"],
+    "load": {
+      "paths": ["<ABSOLUTE_PATH_TO_REPO>/adapters/openclaw/plugin"]
+    },
+    "entries": {
+      "ctrldot": {
+        "enabled": true,
+        "config": {
+          "ctrldotUrl": "http://127.0.0.1:7777",
+          "agentId": "openclaw",
+          "agentName": "OpenClaw Agent"
+        }
+      }
+    }
+  }
+}
