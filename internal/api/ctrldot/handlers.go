@@ -144,6 +144,22 @@ func (h *Handlers) AgentByID(w http.ResponseWriter, r *http.Request) {
 		}
 		respondJSON(w, map[string]string{"status": "resumed"}, http.StatusOK)
 
+	case "limits":
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		lim, err := h.service.GetAgentLimits(r.Context(), agentID)
+		if err != nil {
+			respondError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if lim == nil {
+			respondError(w, "limits not available", http.StatusNotFound)
+			return
+		}
+		respondJSON(w, lim, http.StatusOK)
+
 	default:
 		http.NotFound(w, r)
 	}
@@ -381,6 +397,20 @@ func (h *Handlers) AutobundleTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]string{"path": path}, http.StatusOK)
+}
+
+// LimitsConfig handles GET /v1/limits/config — default limits from config (read-only).
+func (h *Handlers) LimitsConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cfg, err := h.service.GetLimitsConfig(r.Context())
+	if err != nil {
+		respondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, cfg, http.StatusOK)
 }
 
 // Helper functions

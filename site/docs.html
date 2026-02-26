@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation — Ctrl Dot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a href="index.html"><img src="assets/logo.png" alt="Ctrl Dot" class="logo"></a>
+    <hr>
+  </header>
+
+  <main>
+    <h1>Documentation</h1>
+
+    <section id="quickstart">
+      <h2>Quickstart</h2>
+      <pre><code>git clone https://github.com/ctrldot-dev/ctrldot.git
+cd ctrldot
+make build-ctrldot
+./bin/ctrldot daemon start</code></pre>
+      <p>See the <a href="/docs/setup-guide">setup guide</a> for full install, adapters (OpenClaw, CrewAI), and smoke tests.</p>
+    </section>
+
+    <section id="docs-index">
+      <h2>Docs index</h2>
+      <p>Docs are rendered from the repo <code>docs/</code>; when the markdown changes, the site shows the update.</p>
+      <ul>
+        <li><a href="/docs/setup-guide">SETUP_GUIDE.md</a> — end‑to‑end installation and integration (daemon, CrewAI, OpenClaw, smoke tests).</li>
+        <li><a href="/docs/config">CONFIG.md</a> — configuration reference for <code>~/.ctrldot/config.yaml</code> and related env vars.</li>
+        <li><a href="/docs/agent-experience">AGENT_EXPERIENCE.md</a> — how agents detect Ctrl Dot, interpret decisions, and guide users.</li>
+        <li><a href="/docs/troubleshooting">TROUBLESHOOTING.md</a> — common problems and how to fix them.</li>
+        <li><a href="/docs/showcase">SHOWCASE.md</a> — example flows demonstrating decisions and capabilities.</li>
+        <li><a href="/docs/bios-ui">BIOS_UI.md</a> — BIOS‑style TUI (<code>ctrldot bios</code>) layout and behaviour.</li>
+        <li><a href="/docs/index">index.md</a> — docs index and MCP/agentic overview.</li>
+      </ul>
+      <p>On GitHub: <a href="https://github.com/ctrldot-dev/ctrldot/tree/main/docs">docs/</a> · <a href="https://github.com/ctrldot-dev/ctrldot/blob/main/MCP.md">MCP.md</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="bottom-nav">
+      <a href="https://github.com/ctrldot-dev/ctrldot">[GitHub]</a>
+      <a href="docs.html">[Docs]</a>
+      <a href="contact.html">[Contact]</a>
+    </nav>
+  </footer>
+</body>
+</html>

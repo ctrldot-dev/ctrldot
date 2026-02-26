@@ -1,149 +1,285 @@
 :root {
-  --bg: #0f0f0f;
-  --fg: #e8e8e8;
-  --muted: #888;
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
+  --bg: #3D2D90;
+  --fg: #fff;
+  --muted: rgba(255, 255, 255, 0.85);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+}
+
 body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: "Azeret Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   line-height: 1.6;
   color: var(--fg);
   background: var(--bg);
   margin: 0;
-  padding: 2rem 1.5rem;
-  max-width: 42rem;
-  margin-left: auto;
-  margin-right: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 2rem);
 }
 
 header {
-  margin-bottom: 2rem;
+  flex-shrink: 0;
+  margin-bottom: clamp(2rem, 6vw, 3rem);
+}
+
+header .logo {
+  display: block;
+  height: auto;
+  max-width: min(140px, 25vw);
+}
+
+header hr {
+  border: none;
+  border-top: 1px solid var(--fg);
+  margin: clamp(1.5rem, 4vw, 2.5rem) 0 0 0;
+  opacity: 0.9;
+}
+
+main {
+  flex: 1;
+  max-width: 42rem;
+  margin: 0;
+  width: 100%;
 }
 
 h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0 0 0.25rem 0;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 600;
+  margin: 0 0 clamp(1.5rem, 4vw, 2.5rem) 0;
+  line-height: 1.3;
 }
 
-.tagline {
-  font-size: 1.125rem;
-  color: var(--muted);
-  margin: 0;
-}
-
-.lead {
-  font-size: 1.0625rem;
-  margin: 0 0 1.5rem 0;
+h1 .h1-subline {
+  font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+  font-weight: 400;
 }
 
 .features {
   list-style: none;
   padding: 0;
-  margin: 0 0 2rem 0;
+  margin: 0 0 clamp(2rem, 6vw, 3rem) 0;
+  font-size: clamp(1rem, 2.5vw, 1.375rem);
 }
 
 .features li {
-  padding: 0.25rem 0;
-  padding-left: 1.25rem;
-  position: relative;
+  padding: 0.2em 0;
 }
 
-.features li::before {
-  content: "—";
-  position: absolute;
-  left: 0;
-  color: var(--muted);
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 2.5rem;
-}
-
-.btn {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  text-decoration: none;
-  font-weight: 500;
-  transition: background 0.15s;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid var(--muted);
-}
-
-.btn-secondary:hover {
-  border-color: var(--fg);
-  color: var(--fg);
-}
-
-#quickstart {
+#quickstart,
+#docs,
+#docs-index {
   margin-top: 2rem;
   padding-top: 2rem;
-  border-top: 1px solid #333;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: clamp(0.875rem, 2vw, 1rem);
 }
 
-#quickstart h2 {
-  font-size: 1.25rem;
+#quickstart h2,
+#docs h2,
+#docs-index h2 {
+  font-size: 1.125rem;
+  font-weight: 400;
   margin: 0 0 0.75rem 0;
 }
 
 pre {
-  background: #1a1a1a;
+  background: rgba(0, 0, 0, 0.2);
   padding: 1rem;
-  border-radius: 0.375rem;
   overflow-x: auto;
   margin: 0 0 1rem 0;
+  font-size: 0.875rem;
 }
 
 code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.875rem;
+  font-family: inherit;
 }
 
-#quickstart p {
-  margin: 0;
+#quickstart p,
+#docs p,
+#docs-index p {
+  margin: 0 0 0.5rem 0;
   color: var(--muted);
-  font-size: 0.9375rem;
 }
 
-#quickstart a {
-  color: var(--accent);
+#quickstart a,
+#docs a,
+#docs-index a {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+#quickstart a:hover,
+#docs a:hover,
+#docs-index a:hover {
+  opacity: 0.9;
+}
+
+#docs ul,
+#docs-index ul {
+  margin: 0.5rem 0 1rem 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+}
+
+#docs li,
+#docs-index li {
+  margin-bottom: 0.35rem;
 }
 
 footer {
-  margin-top: 3rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #333;
-  font-size: 0.875rem;
-  color: var(--muted);
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: clamp(2rem, 6vw, 3rem);
+  text-align: center;
 }
 
-footer a {
-  color: var(--muted);
+.bottom-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  font-size: clamp(0.9375rem, 2vw, 1.125rem);
 }
 
-footer a:hover {
+.bottom-nav a {
   color: var(--fg);
+  text-decoration: none;
+}
+
+.bottom-nav a:hover {
+  opacity: 0.85;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0 0 1rem 0;
+}
+
+/* Contact page */
+.contact-form {
+  max-width: 28rem;
+  margin: 2rem 0;
+}
+
+.contact-form label {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.9375rem;
+}
+
+.contact-form input,
+.contact-form textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--fg);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.contact-form textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.contact-form input::placeholder,
+.contact-form textarea::placeholder {
+  color: var(--muted);
+}
+
+.contact-form button {
+  margin-top: 1.25rem;
+  padding: 0.5rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--bg);
+  background: var(--fg);
+  border: none;
+  cursor: pointer;
+}
+
+.contact-form button:hover {
+  opacity: 0.9;
+}
+
+/* Doc content (markdown-rendered pages) */
+.doc-content {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+.doc-content h1 {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  margin-bottom: 0.75rem;
+}
+
+.doc-content h2 {
+  font-size: 1.125rem;
+  font-weight: 400;
+  margin: 1.5rem 0 0.5rem 0;
+  padding-top: 0.5rem;
+}
+
+.doc-content h3 {
+  font-size: 1rem;
+  font-weight: 400;
+  margin: 1rem 0 0.35rem 0;
+}
+
+.doc-content p {
+  margin: 0 0 0.75rem 0;
+  color: var(--muted);
+}
+
+.doc-content a {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.doc-content a:hover {
+  opacity: 0.9;
+}
+
+.doc-content ul,
+.doc-content ol {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+}
+
+.doc-content li {
+  margin-bottom: 0.25rem;
+}
+
+.doc-content pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+}
+
+.doc-content code {
+  font-family: inherit;
+}
+
+.doc-content hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  margin: 1.5rem 0;
+}
+
+.doc-content blockquote {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid rgba(255, 255, 255, 0.4);
+  color: var(--muted);
 }

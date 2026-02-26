@@ -307,6 +307,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('agents')">Agents</button>
             <button class="tab" onclick="showTab('events')">Events</button>
+            <button class="tab" onclick="showTab('limits')">Limits</button>
             <button class="tab" onclick="showTab('rules')">Rules</button>
             <button class="tab" onclick="showTab('status')">Status</button>
         </div>
@@ -334,6 +335,21 @@
                 <div id="events-list" class="event-list">
                     <div class="loading">Loading events...</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Limits Tab -->
+        <div id="limits-tab" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Limits &amp; budget</h2>
+                    <button class="btn btn-primary refresh-btn" onclick="loadLimits()">Refresh</button>
+                </div>
+                <div id="limits-config" class="rule-section" style="margin-bottom: 1.5rem;"></div>
+                <div id="limits-list" class="agent-list">
+                    <div class="loading">Loading limits...</div>
+                </div>
+                <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">To change default limits, edit <code>~/.ctrldot/config.yaml</code> (see <code>agents.default</code>) and restart the daemon.</p>
             </div>
         </div>
 
@@ -418,8 +434,76 @@
             // Load data for tab
             if (tabName === 'agents') loadAgents();
             else if (tabName === 'events') loadEvents();
+            else if (tabName === 'limits') loadLimits();
             else if (tabName === 'rules') loadRules();
             else if (tabName === 'status') loadStatus();
+        }
+
+        async function loadLimits() {
+            const configEl = document.getElementById('limits-config');
+            const listEl = document.getElementById('limits-list');
+            configEl.innerHTML = '';
+            listEl.innerHTML = '<div class="loading">Loading limits...</div>';
+
+            try {
+                const [configRes, agentsRes] = await Promise.all([
+                    fetch(api() + '/v1/limits/config'),
+                    fetch(api() + '/v1/agents')
+                ]);
+                if (!configRes.ok || !agentsRes.ok) {
+                    listEl.innerHTML = '<div class="error">Failed to load limits or agents</div>';
+                    return;
+                }
+                const config = await configRes.json();
+                const agents = await agentsRes.json();
+
+                configEl.innerHTML = `
+                    <h3 style="margin-bottom: 0.5rem;">Default limits (config)</h3>
+                    <p style="color:#666;font-size:0.9rem;">
+                        Daily budget: £${(config.daily_budget_gbp || 10).toFixed(2)} &nbsp;|&nbsp;
+                        Warn at: ${(config.warn_pct || []).map(p => (p * 100) + '%').join(', ') || '70%, 90%'} &nbsp;|&nbsp;
+                        Throttle at: ${((config.throttle_pct || 0.95) * 100)}% &nbsp;|&nbsp;
+                        Stop at: ${((config.hard_stop_pct || 1) * 100)}%
+                    </p>
+                `;
+
+                if (agents.length === 0) {
+                    listEl.innerHTML = '<div class="loading">No agents registered. Limits are shown per agent once they exist.</div>';
+                    return;
+                }
+
+                const limitsData = await Promise.all(agents.map(async (agent) => {
+                    try {
+                        const r = await fetch(api() + '/v1/agents/' + agent.agent_id + '/limits');
+                        return r.ok ? await r.json() : null;
+                    } catch (e) { return null; }
+                }));
+
+                listEl.innerHTML = `
+                    <table style="width:100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align:left; border-bottom: 2px solid #ddd;">
+                                <th style="padding: 0.5rem;">Agent</th>
+                                <th style="padding: 0.5rem;">Spent</th>
+                                <th style="padding: 0.5rem;">Limit</th>
+                                <th style="padding: 0.5rem;">Usage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${limitsData.filter(Boolean).map(lim => `
+                                <tr style="border-bottom: 1px solid #eee;">
+                                    <td style="padding: 0.5rem;">${lim.agent_id}</td>
+                                    <td style="padding: 0.5rem;">£${(lim.spent_gbp || 0).toFixed(2)}</td>
+                                    <td style="padding: 0.5rem;">£${(lim.limit_gbp || 0).toFixed(2)}</td>
+                                    <td style="padding: 0.5rem;">${((lim.percentage || 0) * 100).toFixed(1)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                listEl.innerHTML = `<div class="error">Error loading limits: ${error.message}</div>`;
+            }
         }
 
         async function loadAgents() {

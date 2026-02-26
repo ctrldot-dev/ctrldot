@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Ctrl Dot reads configuration from `~/.ctrldot/config.yaml` (or the path in `CTRLDOT_CONFIG`). Missing or partial files are filled with defaults.
+Ctrl Dot reads configuration from `~/.ctrldot/config.yaml` (or the path in `CTRLDOT_CONFIG`). **If the file doesn't exist, the daemon creates it with defaults on first run** — so after starting `ctrldotd` once, you'll have `~/.ctrldot/config.yaml` to edit (e.g. to change limits or rules; restart the daemon to apply). Missing or partial files are filled with defaults.
 
 ## Config file location
 
@@ -15,6 +15,7 @@ Ctrl Dot reads configuration from `~/.ctrldot/config.yaml` (or the path in `CTRL
 | `runtime_store` | `kind`: `sqlite` (default) or `postgres`; `sqlite_path`; `db_url` for Postgres |
 | `ledger_sink` | `kind`: `none` (default), `bundle`, or `kernel_http`; `kernel_http.base_url`, `bundle.output_dir`, signing |
 | `agents.default` | `daily_budget_gbp`, `warn_pct`, `throttle_pct`, `hard_stop_pct`, `max_iterations_per_action` |
+| `display_currency` | `gbp` (default), `usd`, or `eur` — for UI display only; amounts are stored in GBP and converted for display |
 | `rules` | `require_resolution` (action types), `filesystem.allow_roots`, `network.deny_all`, `network.allow_domains` |
 | `panic` | TTL, max budget, thresholds, resolution/filesystem/network/loop overlays when panic is on |
 | `autobundle` | `enabled`, `output_dir`, `debounce_seconds`, `triggers` (on_deny, on_stop, etc.), `include` |

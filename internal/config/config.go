@@ -11,16 +11,17 @@ import (
 
 // Config represents the Ctrl Dot configuration
 type Config struct {
-	Server        ServerConfig        `yaml:"server"`
-	Ledger        LedgerConfig        `yaml:"ledger"`
-	RuntimeStore  RuntimeStoreConfig  `yaml:"runtime_store"`
-	LedgerSink    LedgerSinkConfig    `yaml:"ledger_sink"`
-	Events        EventsConfig        `yaml:"events"`
-	Agents        AgentsConfig        `yaml:"agents"`
-	Rules         RulesConfig         `yaml:"rules"`
-	DegradeModes  DegradeModesConfig  `yaml:"degrade_modes"`
-	Panic         PanicConfig         `yaml:"panic"`
-	Autobundle    AutobundleConfig   `yaml:"autobundle"`
+	Server          ServerConfig        `yaml:"server"`
+	Ledger          LedgerConfig        `yaml:"ledger"`
+	RuntimeStore    RuntimeStoreConfig  `yaml:"runtime_store"`
+	LedgerSink      LedgerSinkConfig    `yaml:"ledger_sink"`
+	Events          EventsConfig        `yaml:"events"`
+	Agents          AgentsConfig        `yaml:"agents"`
+	Rules           RulesConfig         `yaml:"rules"`
+	DegradeModes    DegradeModesConfig  `yaml:"degrade_modes"`
+	Panic           PanicConfig         `yaml:"panic"`
+	Autobundle      AutobundleConfig    `yaml:"autobundle"`
+	DisplayCurrency string              `yaml:"display_currency"` // "gbp", "usd", "eur" — for UI display only; values stored in GBP
 	// Loop is set by Effective() when panic is on; loop detector uses it for window/repeats.
 	Loop *LoopOverlay `yaml:"-"`
 }
@@ -203,6 +204,23 @@ type DegradeMode struct {
 	DenyTools      []string `yaml:"deny_tools"`
 }
 
+// EnsureDefaultConfigFile creates the config directory and writes a default config file if it doesn't exist.
+func EnsureDefaultConfigFile(configPath string) error {
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+	if _, err := os.Stat(configPath); err == nil {
+		return nil // already exists
+	}
+	data, err := yaml.Marshal(DefaultConfig())
+	if err != nil {
+		return fmt.Errorf("marshal default config: %w", err)
+	}
+	header := "# Ctrl Dot config — edit and restart the daemon to apply changes.\n"
+	return os.WriteFile(configPath, append([]byte(header), data...), 0600)
+}
+
 // Load loads configuration from file or environment
 func Load(configPath string) (*Config, error) {
 	cfg := DefaultConfig()
@@ -214,6 +232,13 @@ func Load(configPath string) (*Config, error) {
 			return nil, fmt.Errorf("failed to get home directory: %w", err)
 		}
 		configPath = filepath.Join(home, configPath[2:])
+	}
+
+	// If config file doesn't exist, create it with defaults so the user has a file to edit
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := EnsureDefaultConfigFile(configPath); err != nil {
+			return nil, fmt.Errorf("failed to create default config: %w", err)
+		}
 	}
 
 	// Try to load from file if it exists
@@ -269,6 +294,23 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// Write writes configuration to a file. Path is expanded (e.g. ~ to home).
+func Write(configPath string, cfg *Config) error {
+	if len(configPath) >= 2 && configPath[:2] == "~/" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("home dir: %w", err)
+		}
+		configPath = filepath.Join(home, configPath[2:])
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	header := "# Ctrl Dot config — edit and restart the daemon to apply changes.\n"
+	return os.WriteFile(configPath, append([]byte(header), data...), 0600)
 }
 
 // DefaultConfig returns default configuration

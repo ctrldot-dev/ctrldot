@@ -60,6 +60,12 @@ type Service interface {
 
 	// GetCapabilities returns agent-discovery capabilities (no secrets; paths expanded).
 	GetCapabilities(ctx context.Context) (*domain.CapabilitiesResponse, error)
+
+	// GetAgentLimits returns current budget/limits state for an agent (daily window).
+	GetAgentLimits(ctx context.Context, agentID string) (*domain.AgentLimitsResponse, error)
+
+	// GetLimitsConfig returns default limits from config (read-only view).
+	GetLimitsConfig(ctx context.Context) (*domain.LimitsConfigResponse, error)
 }
 
 // service implements Service
@@ -496,6 +502,76 @@ func expandPathForCapabilities(p string) string {
 		}
 	}
 	return p
+}
+
+// GetAgentLimits returns current budget/limits state for an agent (daily window).
+func (s *service) GetAgentLimits(ctx context.Context, agentID string) (*domain.AgentLimitsResponse, error) {
+	now := time.Now()
+	windowStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	windowStartTS := windowStart.Unix() * 1000
+
+	state, err := s.runtimeStore.GetLimitsState(ctx, agentID, windowStartTS, "daily")
+	if err != nil {
+		return nil, err
+	}
+	spent := 0.0
+	actionCount := 0
+	if state != nil {
+		spent = state.BudgetSpentGBP
+		actionCount = state.ActionCount
+	}
+
+	defaults := config.AgentDefaults{
+		DailyBudgetGBP:      10.0,
+		WarnPct:             []float64{0.70, 0.90},
+		ThrottlePct:         0.95,
+		HardStopPct:         1.00,
+		MaxIterationsPerAction: 25,
+	}
+	if s.config != nil {
+		defaults = s.config.Agents.Default
+	}
+	limit := defaults.DailyBudgetGBP
+	if limit <= 0 {
+		limit = 10.0
+	}
+	pct := 0.0
+	if limit > 0 {
+		pct = spent / limit
+	}
+
+	return &domain.AgentLimitsResponse{
+		AgentID:     agentID,
+		WindowStart: windowStart,
+		WindowType:  "daily",
+		SpentGBP:    spent,
+		LimitGBP:    limit,
+		Percentage:  pct,
+		WarnPct:     defaults.WarnPct,
+		ThrottlePct: defaults.ThrottlePct,
+		HardStopPct: defaults.HardStopPct,
+		ActionCount: actionCount,
+	}, nil
+}
+
+// GetLimitsConfig returns default limits from config (read-only).
+func (s *service) GetLimitsConfig(ctx context.Context) (*domain.LimitsConfigResponse, error) {
+	defaults := config.AgentDefaults{
+		DailyBudgetGBP:      10.0,
+		WarnPct:             []float64{0.70, 0.90},
+		ThrottlePct:         0.95,
+		HardStopPct:         1.00,
+		MaxIterationsPerAction: 25,
+	}
+	if s.config != nil {
+		defaults = s.config.Agents.Default
+	}
+	return &domain.LimitsConfigResponse{
+		DailyBudgetGBP: defaults.DailyBudgetGBP,
+		WarnPct:        defaults.WarnPct,
+		ThrottlePct:    defaults.ThrottlePct,
+		HardStopPct:    defaults.HardStopPct,
+	}, nil
 }
 
 func buildDecisionRecord(proposal domain.ActionProposal, response *domain.DecisionResponse, ev *domain.Event, budgetLimit float64) *sink.DecisionRecord {

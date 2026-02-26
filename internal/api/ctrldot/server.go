@@ -58,6 +58,7 @@ func NewServer(port int, ctrldotService ctrldot.Service, autobundleMgr *autobund
 	mux.HandleFunc("/v1/autobundle", handlers.AutobundleStatus)
 	mux.HandleFunc("/v1/autobundle/test", handlers.AutobundleTest)
 	mux.HandleFunc("/v1/capabilities", handlers.Capabilities)
+	mux.HandleFunc("/v1/limits/config", handlers.LimitsConfig)
 
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),

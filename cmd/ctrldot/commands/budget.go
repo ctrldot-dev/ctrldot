@@ -12,32 +12,37 @@ import (
 func budgetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "budget <agent_id>",
-		Short: "Show agent budget status",
+		Short: "Show agent budget/limits status",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			serverURL, _ := cmd.Flags().GetString("server")
 			outputJSON, _ := cmd.Flags().GetBool("json")
 			agentID := args[0]
 
-			// TODO: Implement budget endpoint in API
-			resp, err := http.Get(serverURL + "/v1/agents/" + agentID + "/budget")
+			resp, err := http.Get(serverURL + "/v1/agents/" + agentID + "/limits")
 			if err != nil {
 				return err
 			}
 			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("agent limits: %s", resp.Status)
+			}
 
-			var budget map[string]interface{}
-			if err := json.NewDecoder(resp.Body).Decode(&budget); err != nil {
+			var lim map[string]interface{}
+			if err := json.NewDecoder(resp.Body).Decode(&lim); err != nil {
 				return err
 			}
 
 			if outputJSON {
-				json.NewEncoder(os.Stdout).Encode(budget)
+				json.NewEncoder(os.Stdout).Encode(lim)
 			} else {
-				fmt.Printf("Budget for agent %s:\n", agentID)
-				fmt.Printf("  Spent: £%.2f\n", budget["spent_gbp"])
-				fmt.Printf("  Limit: £%.2f\n", budget["limit_gbp"])
-				fmt.Printf("  Percentage: %.1f%%\n", budget["percentage"])
+				spent, _ := lim["spent_gbp"].(float64)
+				limit, _ := lim["limit_gbp"].(float64)
+				pct, _ := lim["percentage"].(float64)
+				fmt.Printf("Budget for agent %s (daily):\n", agentID)
+				fmt.Printf("  Spent: £%.2f\n", spent)
+				fmt.Printf("  Limit: £%.2f\n", limit)
+				fmt.Printf("  Usage: %.1f%%\n", pct*100)
 			}
 
 			return nil

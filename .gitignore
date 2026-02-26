@@ -20,6 +20,10 @@ context/
 
 # Dependency directories
 vendor/
+node_modules/
+
+# OS files
+.DS_Store
 
 # Go workspace file
 go.work

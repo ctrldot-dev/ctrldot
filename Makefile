@@ -101,6 +101,14 @@ build-ctrldot:
 	@go build -o bin/ctrldot-mcp ./cmd/ctrldot-mcp
 	@echo "Built: bin/ctrldotd, bin/ctrldot, bin/ctrldot-mcp"
 
+# Install Ctrl Dot binaries to ~/bin (so 'ctrldot' in PATH is current)
+install-ctrldot: build-ctrldot
+	@mkdir -p ~/bin
+	@cp bin/ctrldot bin/ctrldotd bin/ctrldot-mcp ~/bin/
+	@chmod +x ~/bin/ctrldot ~/bin/ctrldotd ~/bin/ctrldot-mcp
+	@echo "Installed ctrldot, ctrldotd, ctrldot-mcp to ~/bin"
+	@echo "Ensure ~/bin is in your PATH: export PATH=\$$PATH:\$$HOME/bin"
+
 # Start Ctrl Dot daemon (requires Postgres and migrations)
 ctrldot-up: docker-up build-ctrldot
 	@echo "Starting Ctrl Dot on port $(CTRLDOT_PORT)..."

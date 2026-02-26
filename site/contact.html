@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact — Ctrl Dot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a href="index.html"><img src="assets/logo.png" alt="Ctrl Dot" class="logo"></a>
+    <hr>
+  </header>
+
+  <main>
+    <h1>Contact</h1>
+    <p class="muted">Send a message and we’ll get back to you.</p>
+    <form class="contact-form" action="mailto:contact@ctrldot.dev" method="get" enctype="text/plain">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="Your name">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" placeholder="your@email.com" required>
+      <label for="body">Message</label>
+      <textarea id="body" name="body" placeholder="Your message" required></textarea>
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+  <footer>
+    <nav class="bottom-nav">
+      <a href="https://github.com/ctrldot-dev/ctrldot">[GitHub]</a>
+      <a href="docs.html">[Docs]</a>
+      <a href="contact.html">[Contact]</a>
+    </nav>
+  </footer>
+</body>
+</html>

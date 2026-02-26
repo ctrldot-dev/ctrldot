@@ -2,9 +2,11 @@
 
 Ctrl Dot can be used as an MCP server, allowing AI tools (like Claude Desktop, Cursor, etc.) to interact with it.
 
-## MCP Server
+## MCP Servers
 
-The `ctrldot-mcp` binary provides an MCP-compatible interface:
+### 1. Ctrl Dot decisions (`ctrldot-mcp`)
+
+The `ctrldot-mcp` binary provides an MCP-compatible interface to the Ctrl Dot daemon:
 
 ```bash
 # Propose an action
@@ -13,7 +15,52 @@ The `ctrldot-mcp` binary provides an MCP-compatible interface:
 # Output: {"decision":"DENY","reason":"Requires resolution","allowed":false}
 ```
 
-## MCP Tools
+### 2. Docs server (`ctrldot-docs`)
+
+The `mcp-docs` project provides a **read‑only** MCP server over the local `docs/` folder. It exposes three tools:
+
+- **`List Docs`** — list all available documentation pages (id, title, path)
+- **`Fetch Doc`** — fetch a single page’s full Markdown and (optionally) its headings + anchors
+- **`Search Docs`** — search across docs and return ranked matches with snippets and nearest headings
+
+From the repo root:
+
+```bash
+cd mcp-docs
+npx tsx src/index.ts
+```
+
+By default it reads from `../docs`. To point it elsewhere:
+
+```bash
+CTRLDOT_DOCS_ROOT=/absolute/path/to/docs npx tsx src/index.ts
+```
+
+You can also enable simple “hot reload” on every call:
+
+```bash
+CTRLDOT_DOCS_RELOAD=1 npx tsx src/index.ts
+```
+
+Typical MCP client configuration (Cursor / Claude) looks like:
+
+```json
+{
+  "mcpServers": {
+    "ctrldot-docs": {
+      "command": "npx",
+      "args": ["tsx", "src/index.ts"],
+      "cwd": "/ABS/PATH/TO/CtrlDot/mcp-docs",
+      "env": {
+        "CTRLDOT_DOCS_ROOT": "/ABS/PATH/TO/CtrlDot/docs",
+        "CTRLDOT_DOCS_RELOAD": "1"
+      }
+    }
+  }
+}
+```
+
+## MCP Tools (ctrldot-mcp)
 
 Ctrl Dot exposes these MCP tools:
 

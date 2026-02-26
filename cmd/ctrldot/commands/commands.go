@@ -41,6 +41,9 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	// Doctor
 	rootCmd.AddCommand(doctorCmd())
 
+	// BIOS TUI
+	rootCmd.AddCommand(biosCmd())
+
 	// Bundle
 	rootCmd.AddCommand(bundleCmd())
 
@@ -49,4 +52,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 
 	// Autobundle
 	rootCmd.AddCommand(autobundleCmd())
+
+	// Config
+	rootCmd.AddCommand(configCmd())
 }

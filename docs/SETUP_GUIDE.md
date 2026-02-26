@@ -311,20 +311,7 @@ Confirm:
 
 ---
 
-# 6️⃣ How to deploy (ctrldot.dev)
-
-The minimal marketing site in `site/` is deployed to **GitHub Pages** via the workflow `.github/workflows/pages.yml` (runs on push to `main`). No build step — the `site/` folder is uploaded as-is.
-
-1. In the repo: **Settings → Pages** → set source to **GitHub Actions**.
-2. Push to `main`; the workflow deploys `site/` to Pages.
-3. Add custom domain `ctrldot.dev` in Pages settings and enable **Enforce HTTPS**.
-4. At your DNS registrar, add the A and CNAME records shown in your repo’s **Settings → Pages** (custom domain) for your Pages host.
-
-After DNS propagates, `https://ctrldot.dev` will serve the static site. Optional: add `site/.well-known/security.txt` for a security contact.
-
----
-
-# 7️⃣ Directory Summary
+# 6️⃣ Directory Summary
 
 After setup, the repo should include:
 
@@ -343,7 +330,7 @@ adapters/openclaw/plugin/dist/
 
 ---
 
-# 8️⃣ Success Criteria
+# 7️⃣ Success Criteria
 
 - CrewAI example runs
 - OpenClaw loads plugin
